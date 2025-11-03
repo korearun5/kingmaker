@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Waiting for Game Code - Betting Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .waiting-animation {
+            background: linear-gradient(45deg, #ffc107, #ff8c00);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(255,255,255,0.3);
+            border-top: 6px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .code-received {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin: 20px 0;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0"><i class="fas fa-clock"></i> Waiting for Game Code</h4>
+                        <span class="badge bg-info" id="connectionStatus">
+                            <i class="fas fa-wifi"></i> Connecting...
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Waiting Animation (shown initially) -->
+                        <div class="waiting-animation" id="waitingSection">
+                            <div class="spinner"></div>
+                            <h3>Waiting for Game Code</h3>
+                            <p class="mb-0">The bet creator is setting up the game code...</p>
+                            <p class="mb-0"><small>You'll be notified instantly when it's ready!</small></p>
+                        </div>
+
+                        <!-- Code Received Section (hidden initially) -->
+                        <div class="code-received" id="codeReceivedSection" style="display: none;">
+                            <h3><i class="fas fa-check-circle"></i> Code Received!</h3>
+                            <div class="display-4 fw-bold mb-3" id="receivedCode">GAME-123</div>
+                            <p class="mb-3">Game code has been shared! You can now join the match.</p>
+                            <a th:href="@{/bets/{betId}/game-code(betId=${bet.id})}" class="btn btn-light btn-lg">
+                                <i class="fas fa-arrow-right"></i> Continue to Game Page
+                            </a>
+                        </div>
+
+                        <!-- Match Information -->
+                        <div class="card border-info mb-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Match Details</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong><i class="fas fa-gamepad"></i> Game:</strong> 
+                                           <span th:text="${bet.gameType}">Chess</span></p>
+                                        <p><strong><i class="fas fa-coins"></i> Points:</strong> 
+                                           <span th:text="${bet.points}">100</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong><i class="fas fa-user"></i> Opponent:</strong> 
+                                           <span th:text="${bet.creator.username}">Creator</span></p>
+                                        <p><strong><i class="fas fa-clock"></i> Status:</strong> 
+                                           <span class="badge bg-warning" id="statusBadge">WAITING FOR CODE</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Real-time Updates -->
+                        <div class="alert alert-info" id="realTimeUpdates">
+                            <h6><i class="fas fa-bolt"></i> Live Updates</h6>
+                            <div id="updateMessages">
+                                <div class="text-muted">Waiting for game code to be set by <strong th:text="${bet.creator.username}">Creator</strong>...</div>
+                            </div>
+                        </div>
+
+                        <!-- Instructions -->
+                        <div class="alert alert-secondary">
+                            <h6><i class="fas fa-list-ol"></i> What's Happening:</h6>
+                            <ol class="mb-0">
+                                <li>You've accepted the challenge from <strong th:text="${bet.creator.username}">Creator</strong></li>
+                                <li>The bet creator is setting up the game/room</li>
+                                <li>Once they set the code, it will appear here <strong>automatically</strong></li>
+                                <li>You'll then be able to join the game and play</li>
+                                <li>After the match, submit your result</li>
+                            </ol>
+                        </div>
+
+                        <!-- Manual Check Button -->
+                        <div class="text-center">
+                            <button class="btn btn-outline-primary me-2" onclick="checkCodeStatus()">
+                                <i class="fas fa-sync-alt"></i> Check for Code
+                            </button>
+                            <a th:href="@{/dashboard}" class="btn btn-secondary">
+                                <i class="fas fa-home"></i> Back to Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const betId = /*[[${bet.id}]]*/ 0;
+        const currentUser = /*[[${user.username}]]*/ 'user';
+        /*]]>*/
+    </script>
+
+    <script>
+        let stompClient = null;
+        
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('✅ Connected to WebSocket for game code updates');
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<i class="fas fa-wifi"></i> Live Connected';
+                document.getElementById('connectionStatus').className = 'badge bg-success';
+                
+                // Subscribe to bet updates
+                stompClient.subscribe('/topic/bet/' + betId, function(message) {
+                    const update = JSON.parse(message.body);
+                    handleRealTimeUpdate(update);
+                });
+                
+                // Join the bet room
+                stompClient.send("/app/bet/" + betId + "/join", {}, 
+                    JSON.stringify({'username': currentUser, 'socketId': 'web'}));
+                
+            }, function(error) {
+                console.log('❌ WebSocket connection error');
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<i class="fas fa-wifi-slash"></i> Disconnected';
+                document.getElementById('connectionStatus').className = 'badge bg-danger';
+            });
+        }
+        
+        function handleRealTimeUpdate(update) {
+            console.log('Received update:', update);
+            
+            if (update.type === 'CODE_SHARED') {
+                showCodeReceived(update.roomCode);
+            }
+        }
+        
+        function showCodeReceived(roomCode) {
+            // Hide waiting section, show code received section
+            document.getElementById('waitingSection').style.display = 'none';
+            document.getElementById('codeReceivedSection').style.display = 'block';
+            
+            // Update the code display
+            document.getElementById('receivedCode').textContent = roomCode;
+            
+            // Update status badge
+            document.getElementById('statusBadge').textContent = 'CODE RECEIVED';
+            document.getElementById('statusBadge').className = 'badge bg-success';
+            
+            // Update messages
+            document.getElementById('updateMessages').innerHTML = 
+                '<div class="text-success"><i class="fas fa-check-circle"></i> ' +
+                'Game code received! You can now join the match.</div>';
+        }
+        
+        function checkCodeStatus() {
+            // Manual check by reloading the page
+            window.location.reload();
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>

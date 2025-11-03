@@ -1,10 +1,10 @@
 package com.kore.king.entity;
 
 public enum BetStatus {
-    PENDING,    // Bet is created and waiting for a match
-    MATCHED,    // Bet is matched with another bet
-    IN_PROGRESS, // The game is in progress
-    COMPLETED,  // The game is completed and result is submitted
-    CANCELLED,   // Bet is cancelled
-    DISPUTED
+    PENDING,        // Bet created, waiting for acceptance
+    ACCEPTED,       // Bet accepted, waiting for room code  
+    CODE_SHARED,    // Room code shared, waiting for results
+    COMPLETED,      // Match completed and resolved
+    CANCELLED,      // Bet cancelled
+    DISPUTED        // Results disputed (both claimed win or other issues)
 }

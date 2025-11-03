@@ -51,18 +51,18 @@ public class DashboardController {
 
             long activeBetsCount = betService.findUserActiveBetsCount(user.getId());
 
-            // Get user's matched bets
-            List<Bet> userMatchedBets = betService.findUserBets(user.getId(), Pageable.unpaged())
+            // FIXED: Get user's accepted bets (waiting for code or code shared)
+            List<Bet> userAcceptedBets = betService.findUserBets(user.getId(), Pageable.unpaged())
                 .getContent()
                 .stream()
-                .filter(bet -> bet.getStatus() == BetStatus.MATCHED)
+                .filter(bet -> bet.getStatus() == BetStatus.ACCEPTED || bet.getStatus() == BetStatus.CODE_SHARED)
                 .collect(Collectors.toList());
 
             model.addAttribute("user", user);
             model.addAttribute("activeBets", activeBetsCount);
             model.addAttribute("preloadedBets", availableBets);
             model.addAttribute("userPendingBets", userPendingBets);
-            model.addAttribute("userMatchedBets", userMatchedBets);
+            model.addAttribute("userMatchedBets", userAcceptedBets); // Now using accepted bets
 
             return "dashboard";
         } catch (Exception e) {
@@ -89,11 +89,9 @@ public class DashboardController {
         }
     }
 
-    // SINGLE createBet method with userProvidedCode
     @PostMapping("/create-bet")
     public String createBet(@RequestParam Integer points,
                         @RequestParam String gameType,
-                        @RequestParam String userProvidedCode,
                         Authentication authentication,
                         RedirectAttributes redirectAttributes) {
         try {
@@ -101,13 +99,13 @@ public class DashboardController {
             User user = userService.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            Bet bet = betService.createBet(user, points, gameType, userProvidedCode);
+            Bet bet = betService.createBet(user, points, gameType);
             
             // Broadcast new bet to ALL users via WebSocket
             broadcastNewBet(bet);
             
             redirectAttributes.addFlashAttribute("success", 
-                "Bet created! Share the code: " + userProvidedCode + " with your opponent.");
+                "Bet created successfully! Waiting for opponent to accept.");
             
             return "redirect:/dashboard";
             
@@ -126,8 +124,8 @@ public class DashboardController {
             message.put("points", bet.getPoints());
             message.put("gameType", bet.getGameType());
             message.put("creatorUsername", bet.getCreator().getUsername());
-            message.put("userProvidedCode", bet.getUserProvidedCode());
             message.put("createdAt", bet.getCreatedAt());
+            message.put("status", bet.getStatus().toString());
             
             messagingTemplate.convertAndSend("/topic/bet-updates", message);
             System.out.println("📢 Broadcasted new bet: " + bet.getId() + " by " + bet.getCreator().getUsername());

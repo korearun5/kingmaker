@@ -2,6 +2,7 @@ package com.kore.king.entity;
 
 import java.time.LocalDateTime;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -39,7 +40,6 @@ public class Bet {
     @JoinColumn(name = "matched_bet_id")
     private Bet matchedBet; // The bet this was matched with
 
-
     private String userProvidedCode;     // Code provided by creator
     private String winnerUsername;       // Who won
     private String loserUsername;        // Who lost  
@@ -49,6 +49,13 @@ public class Bet {
     private Boolean creatorSubmitted = false;
     private Boolean acceptorSubmitted = false;
 
+    @Column(name = "dispute_reason")
+    private String disputeReason;
+
+    // ADD THESE NEW FIELDS FOR REAL-TIME UPDATES
+    private String creatorSocketId;
+    private String acceptorSocketId;
+
     public Bet() {}
 
     public Bet(User creator, Integer points, String gameType) {
@@ -57,7 +64,6 @@ public class Bet {
         this.gameType = gameType;
         this.expiresAt = LocalDateTime.now().plusHours(24);
     }
-
 
     // getters and setters
     public User getCreator() { return creator; }
@@ -114,8 +120,7 @@ public class Bet {
         this.status = status;
     }
 
-
-public String getUserProvidedCode() { return userProvidedCode; }
+    public String getUserProvidedCode() { return userProvidedCode; }
     public void setUserProvidedCode(String userProvidedCode) { this.userProvidedCode = userProvidedCode; }
     
     public String getWinnerUsername() { return winnerUsername; }
@@ -138,5 +143,14 @@ public String getUserProvidedCode() { return userProvidedCode; }
     
     public Boolean getAcceptorSubmitted() { return acceptorSubmitted; }
     public void setAcceptorSubmitted(Boolean acceptorSubmitted) { this.acceptorSubmitted = acceptorSubmitted; }
-}
 
+    public String getDisputeReason() { return disputeReason; }
+    public void setDisputeReason(String disputeReason) { this.disputeReason = disputeReason; }
+
+    // NEW GETTERS AND SETTERS
+    public String getCreatorSocketId() { return creatorSocketId; }
+    public void setCreatorSocketId(String creatorSocketId) { this.creatorSocketId = creatorSocketId; }
+    
+    public String getAcceptorSocketId() { return acceptorSocketId; }
+    public void setAcceptorSocketId(String acceptorSocketId) { this.acceptorSocketId = acceptorSocketId; }
+}

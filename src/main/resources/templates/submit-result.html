@@ -37,6 +37,16 @@
             border-color: #dc3545;
             background-color: #fff8f8;
         }
+        /* FIX: Ensure proper page layout */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow-x: hidden;
+        }
+        .container {
+            min-height: 80vh;
+        }
     </style>
 </head>
 <body>
@@ -76,7 +86,7 @@
 
                         <!-- Result Form -->
                         <form th:action="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
-                              method="post" enctype="multipart/form-data">
+                              method="post" enctype="multipart/form-data" id="resultForm">
                             
                             <!-- Result Selection -->
                             <div class="mb-4">
@@ -142,7 +152,7 @@
                                 <a th:href="@{/dashboard}" class="btn btn-secondary btn-lg me-md-2">
                                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                                 </a>
-                                <button type="submit" class="btn btn-primary btn-lg">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
                                     <i class="fas fa-paper-plane"></i> Submit Result
                                 </button>
                             </div>
@@ -155,6 +165,16 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // FIX: Force scroll to top on page load
+        window.addEventListener('load', function() {
+            window.scrollTo(0, 0);
+        });
+
+        // FIX: Prevent browser from remembering scroll position
+        if (history.scrollRestoration) {
+            history.scrollRestoration = 'manual';
+        }
+
         // Result selection with visual feedback
         function selectResult(result) {
             // Remove selected class from all options
@@ -210,11 +230,12 @@
             }
         }
         
-        // Form validation
-        document.querySelector('form').addEventListener('submit', function(e) {
+        // FIX: Enhanced form submission with loading state
+        document.getElementById('resultForm').addEventListener('submit', function(e) {
             const resultSelected = document.querySelector('input[name="result"]:checked');
             const screenshot = document.getElementById('screenshot').files[0];
             const winSelected = document.getElementById('win').checked;
+            const submitBtn = document.getElementById('submitBtn');
             
             if (!resultSelected) {
                 e.preventDefault();
@@ -227,10 +248,22 @@
                 alert('Screenshot is required when claiming victory.');
                 return;
             }
+            
+            // Show loading state
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            }
+            
+            // Force scroll to top before submission
+            window.scrollTo(0, 0);
         });
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Force scroll to top
+            window.scrollTo(0, 0);
+            
             // Check if any result is already selected
             const selectedResult = document.querySelector('input[name="result"]:checked');
             if (selectedResult) {

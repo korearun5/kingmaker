@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Dashboard</title>
+</head>
+<body>
+    <h1>Test Dashboard</h1>
+    <p>User: <span th:text="${user?.username} ?: 'No user'">Test</span></p>
+    <p>Points: <span th:text="${user?.points} ?: '0'">0</span></p>
+    <p>Active Bets: <span th:text="${activeBets} ?: '0'">0</span></p>
+</body>
+</html>

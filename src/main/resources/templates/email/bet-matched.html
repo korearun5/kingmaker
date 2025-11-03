@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Bet Matched</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(45deg, #28a745, #20c997); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .game-code { font-size: 24px; font-weight: bold; text-align: center; background: white; padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Bet Matched!</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hello <span th:text="${username}">User</span>,</p>
+            
+            <p>Great news! Your <strong th:text="${points}">100</strong> point bet for 
+            <strong th:text="${gameType}">Game</strong> has been matched with 
+            <strong th:text="${opponent}">Opponent</strong>.</p>
+            
+            <div class="game-code">
+                Your Game Code: <span th:text="${gameCode}">ABC123</span>
+            </div>
+            
+            <p><strong>What to do next:</strong></p>
+            <ol>
+                <li>Share the game code above with your opponent</li>
+                <li>Play your game on your preferred platform</li>
+                <li>Submit your win screenshot on the platform after the game</li>
+            </ol>
+            
+            <p>Good luck! 🍀</p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 Betting Platform. All rights reserved.</p>
+            <p><a th:href="${baseUrl}">Visit Platform</a></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - Betting Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background-color: #343a40;
+        }
+        .sidebar .nav-link {
+            color: #fff;
+        }
+        .sidebar .nav-link:hover {
+            background-color: #495057;
+        }
+        .points-display {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .bet-card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            transition: transform 0.2s;
+        }
+        .bet-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <h4 class="text-white text-center mb-4">Betting Platform</h4>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" th:href="@{/dashboard}">
+                                <i class="fas fa-home"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" th:href="@{/create-bet}">
+                                <i class="fas fa-plus-circle"></i> Create Bet
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" th:href="@{/available-bets}">
+                                <i class="fas fa-list"></i> Available Bets
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" th:href="@{/my-bets}">
+                                <i class="fas fa-history"></i> My Bets
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-cog"></i> Settings
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <form th:action="@{/logout}" method="post">
+                                <button type="submit" class="nav-link btn btn-link text-start w-100">
+                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Dashboard</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="points-display">
+                            <h4><i class="fas fa-coins"></i> Your Points: <span th:text="${user?.points}">1000</span></h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-white bg-primary">
+                            <div class="card-body">
+                                <h5 class="card-title">Active Bets</h5>
+                                <h2 th:text="${activeBets} ?: '0'">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-success">
+                            <div class="card-body">
+                                <h5 class="card-title">Wins</h5>
+                                <h2>0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-warning">
+                            <div class="card-body">
+                                <h5 class="card-title">Pending</h5>
+                                <h2>0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-info">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Bets</h5>
+                                <h2>0</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Quick Actions</h5>
+                            </div>
+                            <div class="card-body">
+                                <a th:href="@{/create-bet}" class="btn btn-primary me-2">
+                                    <i class="fas fa-plus"></i> Create New Bet
+                                </a>
+                                <a th:href="@{/available-bets}" class="btn btn-success me-2">
+                                    <i class="fas fa-search"></i> Find Bets
+                                </a>
+                                <a href="#" class="btn btn-info">
+                                    <i class="fas fa-history"></i> Bet History
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Real-Time Available Bets -->
+                <div class="row mt-4" id="realTimeBetsSection">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-bolt"></i> Live Available Bets</h5>
+                            <small class="text-muted" id="betsCount">0 bets available</small>
+                        </div>
+                        <div class="card-body">
+                            <div id="liveBetsContainer">
+                                <!-- Bets will be populated by WebSocket -->
+                                <div class="text-center text-muted" id="noBetsMessage">
+                                    <i class="fas fa-search fa-2x mb-2"></i>
+                                    <p>No live bets available. Bets will appear here in real-time.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                <!-- Recent Activity -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Recent Activity</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> No recent activity. 
+                                    <a th:href="@{/create-bet}">Create your first bet!</a>
+                                </div>
+                                <!-- Example bet cards - will be dynamically populated -->
+                                <div class="bet-card card">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between">
+                                            <div>
+                                                <h6 class="card-title">Chess Match - 100 Points</h6>
+                                                <p class="card-text text-muted">Waiting for opponent...</p>
+                                            </div>
+                                            <span class="badge bg-warning">PENDING</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- WebSocket Notifications -->
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const username = /*[[${user.username}]]*/ 'user';
+    /*]]>*/
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+<script>
+    let stompClient = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+            reconnectAttempts = 0;
+            
+            // Subscribe to user-specific notifications
+            stompClient.subscribe('/user/queue/notifications', function(message) {
+                const notification = JSON.parse(message.body);
+                showNotification(notification);
+            });
+            
+            // Subscribe to global bet updates
+            stompClient.subscribe('/topic/bet-updates', function(message) {
+                const update = JSON.parse(message.body);
+                handleBetUpdate(update);
+            });
+            
+        }, function(error) {
+            console.log('WebSocket connection error: ', error);
+            handleDisconnect();
+        });
+    }
+
+    function handleDisconnect() {
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            setTimeout(function() {
+                console.log('Attempting to reconnect... (' + reconnectAttempts + ')');
+                connect();
+            }, 3000 * reconnectAttempts);
+        }
+    }
+
+    function showNotification(notification) {
+        const toastContainer = document.getElementById('toastContainer');
+        const toastId = 'toast-' + Date.now();
+        
+        const toastHTML = `
+            <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <strong class="me-auto">Betting Platform</strong>
+                    <small class="text-muted">just now</small>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">
+                    ${notification.message}
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+        
+        // Update dashboard stats if needed
+        if (notification.type === 'BET_MATCHED' || notification.type === 'BET_WON' || notification.type === 'BET_LOST') {
+            updateDashboardStats();
+        }
+    }
+
+    function handleBetUpdate(update) {
+        // Update specific bet cards or refresh the list
+        if (update.type === 'BET_STATUS_CHANGE') {
+            const betCard = document.querySelector(`[data-bet-id="${update.betId}"]`);
+            if (betCard) {
+                updateBetCard(betCard, update);
+            }
+        }
+    }
+
+    function updateDashboardStats() {
+        // Simple page refresh for now - in production, you'd use AJAX
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    }
+
+    function updateBetCard(betCard, update) {
+        const statusBadge = betCard.querySelector('.bet-status');
+        if (statusBadge) {
+            statusBadge.textContent = update.newStatus;
+            statusBadge.className = 'badge bg-' + getStatusColor(update.newStatus);
+        }
+    }
+
+    function getStatusColor(status) {
+        const colors = {
+            'PENDING': 'warning',
+            'MATCHED': 'info', 
+            'COMPLETED': 'success',
+            'CANCELLED': 'secondary',
+            'DISPUTED': 'danger'
+        };
+        return colors[status] || 'secondary';
+    }
+    // ===== ADD THESE NEW FUNCTIONS AFTER YOUR EXISTING WEBSOCKET FUNCTIONS =====
+
+    // Add to your existing WebSocket subscriptions
+    stompClient.subscribe('/topic/bet-updates', function(message) {
+        const update = JSON.parse(message.body);
+        handleBetUpdate(update);
+    });
+
+    function handleBetUpdate(update) {
+        if (update.type === 'NEW_BET') {
+            addLiveBet(update);
+        } else if (update.type === 'BET_STATUS_CHANGE') {
+            updateBetCard(update);
+        } else if (update.type === 'BET_ACCEPTED') {
+            removeLiveBet(update.betId);
+        }
+    }
+
+    function addLiveBet(betData) {
+        const container = document.getElementById('liveBetsContainer');
+        const noBetsMessage = document.getElementById('noBetsMessage');
+        
+        // Hide "no bets" message if it's the first bet
+        if (noBetsMessage) {
+            noBetsMessage.style.display = 'none';
+        }
+        
+        const betElement = document.createElement('div');
+        betElement.className = 'bet-card card mb-3';
+        betElement.setAttribute('data-bet-id', betData.id);
+        
+        betElement.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="card-title">
+                            <span class="badge bg-primary">NEW</span>
+                            ${betData.points} Points Bet
+                        </h6>
+                        <p class="card-text mb-1">
+                            <strong>Game:</strong> ${betData.gameType}<br>
+                            <strong>By:</strong> ${betData.creatorUsername}<br>
+                            <small class="text-muted">Just now</small>
+                        </p>
+                    </div>
+                    <span class="badge bg-success">
+                        <i class="fas fa-coins"></i> ${betData.points}
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <a href="/bets/available" class="btn btn-success btn-sm">
+                        <i class="fas fa-check"></i> View & Accept
+                    </a>
+                </div>
+            </div>
+        `;
+        
+        // Add with animation
+        betElement.style.opacity = '0';
+        container.insertBefore(betElement, container.firstChild);
+        
+        // Animate appearance
+        setTimeout(() => {
+            betElement.style.transition = 'opacity 0.5s';
+            betElement.style.opacity = '1';
+        }, 100);
+        
+        // Update bets count
+        updateBetsCount();
+    }
+
+    function removeLiveBet(betId) {
+        const betElement = document.querySelector(`[data-bet-id="${betId}"]`);
+        if (betElement) {
+            betElement.style.transition = 'opacity 0.5s';
+            betElement.style.opacity = '0';
+            setTimeout(() => {
+                betElement.remove();
+                updateBetsCount();
+            }, 500);
+        }
+    }
+
+    function updateBetsCount() {
+        const bets = document.querySelectorAll('#liveBetsContainer .bet-card');
+        const countElement = document.getElementById('betsCount');
+        if (countElement) {
+            countElement.textContent = `${bets.length} bet${bets.length !== 1 ? 's' : ''} available`;
+        }
+    }
+
+    // ===== END OF NEW FUNCTIONS =====
+
+    // Initialize connection when page loads - THIS SHOULD ALREADY EXIST
+    document.addEventListener('DOMContentLoaded', function() {
+        connect();
+        updateBetsCount(); // Add this line to initialize the count
+    });
+
+
+
+</script>
+</body>
+</html>

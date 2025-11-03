@@ -33,6 +33,38 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
+        /* ADD THIS CSS FOR BET FEED */
+        .bet-feed-item {
+            border-bottom: 1px solid #eee;
+            transition: all 0.3s ease;
+        }
+        .bet-feed-item:hover {
+            background-color: #f8f9fa;
+        }
+        .bet-feed-item:last-child {
+            border-bottom: none;
+        }
+        /* Add to your existing CSS */
+        html, body, #root {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: auto;
+        }
+
+        .dashboard-container {
+            min-height: 100vh;
+            height: auto;
+        }
+
+        main {
+            min-height: calc(100vh - 200px);
+        }
+
+        /* Ensure proper scrolling */
+        .col-md-9.ms-sm-auto.col-lg-10.px-md-4 {
+            overflow: visible;
+        }
     </style>
 </head>
 <body>
@@ -51,11 +83,6 @@
                         <li class="nav-item">
                             <a class="nav-link" th:href="@{/create-bet}">
                                 <i class="fas fa-plus-circle"></i> Create Bet
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" th:href="@{/available-bets}">
-                                <i class="fas fa-list"></i> Available Bets
                             </a>
                         </li>
                         <li class="nav-item">
@@ -78,7 +105,18 @@
                     </ul>
                 </div>
             </nav>
+            <!-- Flash Messages -->
+            <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle"></i> 
+                <span th:text="${success}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
 
+            <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-circle"></i> 
+                <span th:text="${error}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
             <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -137,36 +175,125 @@
                                 <a th:href="@{/create-bet}" class="btn btn-primary me-2">
                                     <i class="fas fa-plus"></i> Create New Bet
                                 </a>
-                                <a th:href="@{/available-bets}" class="btn btn-success me-2">
-                                    <i class="fas fa-search"></i> Find Bets
+                                <a th:href="@{/my-bets}" class="btn btn-info me-2">
+                                    <i class="fas fa-history"></i> My Bets
                                 </a>
-                                <a href="#" class="btn btn-info">
-                                    <i class="fas fa-history"></i> Bet History
+                                <a href="#" class="btn btn-secondary">
+                                    <i class="fas fa-chart-bar"></i> Leaderboard
                                 </a>
                             </div>
                         </div>
                     </div>
                 </div>
-                <!-- Real-Time Available Bets -->
-                <div class="row mt-4" id="realTimeBetsSection">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5><i class="fas fa-bolt"></i> Live Available Bets</h5>
-                            <small class="text-muted" id="betsCount">0 bets available</small>
-                        </div>
-                        <div class="card-body">
-                            <div id="liveBetsContainer">
-                                <!-- Bets will be populated by WebSocket -->
-                                <div class="text-center text-muted" id="noBetsMessage">
-                                    <i class="fas fa-search fa-2x mb-2"></i>
-                                    <p>No live bets available. Bets will appear here in real-time.</p>
+                <!-- User's Own Active Bets -->
+                <div class="row mt-4" th:if="${!userPendingBets.empty}">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5><i class="fas fa-clock"></i> Your Active Bets</h5>
+                                <small class="text-muted" th:text="${userPendingBets.size() + ' waiting for opponent'}"></small>
+                            </div>
+                            <div class="card-body p-0">
+                                <div th:each="bet : ${userPendingBets}">
+                                    <div class="bet-feed-item border-bottom p-3">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="badge bg-warning me-2">WAITING</span>
+                                                    <strong class="text-info"><i class="fas fa-coins"></i> 
+                                                        <span th:text="${bet.points}"></span> Points
+                                                    </strong>
+                                                </div>
+                                                <h6 class="mb-1" th:text="${bet.gameType + ' Challenge'}"></h6>
+                                                <p class="mb-1 text-muted small">
+                                                    <i class="fas fa-user-clock"></i> Waiting for opponent to accept...
+                                                </p>
+                                                <p class="mb-0 text-muted small">
+                                                    <i class="fas fa-clock"></i> 
+                                                    <span th:text="${#temporals.format(bet.createdAt, 'MMM dd, HH:mm')}"></span>
+                                                </p>
+                                            </div>
+                                            <div class="text-end">
+                                                <form th:action="@{/bets/{betId}/cancel(betId=${bet.id})}" method="post">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                                            onclick="return confirm('Cancel this bet?')">
+                                                        <i class="fas fa-times"></i> Cancel
+                                                    </button>
+                                                </form>
+                                                <small class="text-muted d-block mt-1">You created this bet</small>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+                <!-- Add this to dashboard.html after "Your Active Bets" section -->
+                <div class="row mt-4" th:if="${!userMatchedBets.empty}">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5><i class="fas fa-play-circle"></i> Your Active Matches</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <div th:each="bet : ${userMatchedBets}">
+                                    <div class="bet-feed-item border-bottom p-3">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="badge bg-info me-2">MATCHED</span>
+                                                    <strong class="text-success"><i class="fas fa-coins"></i> 
+                                                        <span th:text="${bet.points}"></span> Points
+                                                    </strong>
+                                                </div>
+                                                <h6 class="mb-1" th:text="${bet.gameType + ' Match'}"></h6>
+                                                <p class="mb-1 text-muted small">
+                                                    <i class="fas fa-code"></i> Game Code: 
+                                                    <code th:text="${bet.sharedCode}"></code>
+                                                </p>
+                                                <p class="mb-1 text-muted small">
+                                                    <i class="fas fa-user"></i> Opponent: 
+                                                    <span th:text="${bet.matchedBet.creator.username}"></span>
+                                                </p>
+                                            </div>
+                                            <div class="text-end">
+                                                <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
+                                                class="btn btn-primary btn-sm">
+                                                    <i class="fas fa-flag"></i> Submit Result
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Real-Time Bet Feed -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5><i class="fas fa-bolt"></i> Live Betting Feed</h5>
+                                <small class="text-muted" id="liveBetsCount">0 active bets</small>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="liveBetsContainer">
+                                    <!-- Bets will appear here in real-time -->
+                                    <div class="text-center text-muted py-5" id="noBetsMessage">
+                                        <i class="fas fa-search fa-2x mb-2"></i>
+                                        <p>No active bets. Create the first one!</p>
+                                        <a th:href="@{/create-bet}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-plus-circle"></i> Create Bet
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Recent Activity -->
                 <div class="row">
                     <div class="col-12">
@@ -211,35 +338,65 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 
+<!--TEMP: Debug pre-loaded bets -->
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    console.log('👤 Current user:', /*[[${user?.username}]]*/ 'unknown');
+    console.log('📊 Pre-loaded bets count:', /*[[${preloadedBets?.size()}]]*/ 0);
+    console.log('📋 Pre-loaded bets:', /*[[${preloadedBets}]]*/ []);
+    /*]]>*/
+</script>
+
 <script>
     let stompClient = null;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 5;
 
-    function connect() {
+function connect() {
+    try {
         const socket = new SockJS('/ws');
         stompClient = Stomp.over(socket);
         
         stompClient.connect({}, function(frame) {
-            console.log('Connected: ' + frame);
+            console.log('✅ WebSocket Connected for user:', username);
             reconnectAttempts = 0;
-            
-            // Subscribe to user-specific notifications
-            stompClient.subscribe('/user/queue/notifications', function(message) {
-                const notification = JSON.parse(message.body);
-                showNotification(notification);
-            });
             
             // Subscribe to global bet updates
             stompClient.subscribe('/topic/bet-updates', function(message) {
-                const update = JSON.parse(message.body);
-                handleBetUpdate(update);
+                console.log('🎯 Global bet update received:', message.body);
+                try {
+                    const update = JSON.parse(message.body);
+                    handleBetUpdate(update);
+                } catch (e) {
+                    console.error('❌ Error parsing WebSocket message:', e);
+                }
             });
             
+            // Test subscription
+            console.log('✅ Subscribed to /topic/bet-updates');
+            
         }, function(error) {
-            console.log('WebSocket connection error: ', error);
+            console.log('❌ WebSocket connection error: ', error);
             handleDisconnect();
         });
+        
+        socket.onerror = function(error) {
+            console.log('❌ SockJS error: ', error);
+        };
+        
+    } catch (error) {
+        console.log('❌ WebSocket initialization error: ', error);
+    }
+}
+
+    // Add this function to test WebSocket manually
+    function testWebSocket() {
+        if (stompClient && stompClient.connected) {
+            console.log('🔄 Testing WebSocket - sending test message');
+            stompClient.send("/app/test", {}, JSON.stringify({test: "hello"}));
+        } else {
+            console.log('❌ WebSocket not connected');
+        }
     }
 
     function handleDisconnect() {
@@ -253,7 +410,15 @@
     }
 
     function showNotification(notification) {
-        const toastContainer = document.getElementById('toastContainer');
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toastContainer';
+            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
         const toastId = 'toast-' + Date.now();
         
         const toastHTML = `
@@ -280,29 +445,11 @@
         }
     }
 
-    function handleBetUpdate(update) {
-        // Update specific bet cards or refresh the list
-        if (update.type === 'BET_STATUS_CHANGE') {
-            const betCard = document.querySelector(`[data-bet-id="${update.betId}"]`);
-            if (betCard) {
-                updateBetCard(betCard, update);
-            }
-        }
-    }
-
     function updateDashboardStats() {
         // Simple page refresh for now - in production, you'd use AJAX
         setTimeout(() => {
             window.location.reload();
         }, 2000);
-    }
-
-    function updateBetCard(betCard, update) {
-        const statusBadge = betCard.querySelector('.bet-status');
-        if (statusBadge) {
-            statusBadge.textContent = update.newStatus;
-            statusBadge.className = 'badge bg-' + getStatusColor(update.newStatus);
-        }
     }
 
     function getStatusColor(status) {
@@ -315,21 +462,32 @@
         };
         return colors[status] || 'secondary';
     }
-    // ===== ADD THESE NEW FUNCTIONS AFTER YOUR EXISTING WEBSOCKET FUNCTIONS =====
 
-    // Add to your existing WebSocket subscriptions
-    stompClient.subscribe('/topic/bet-updates', function(message) {
-        const update = JSON.parse(message.body);
-        handleBetUpdate(update);
-    });
-
+    // ===== ENHANCED BET UPDATE HANDLER =====
     function handleBetUpdate(update) {
+        console.log('Received bet update:', update);
         if (update.type === 'NEW_BET') {
-            addLiveBet(update);
-        } else if (update.type === 'BET_STATUS_CHANGE') {
-            updateBetCard(update);
+            // Check if this is not the current user's own bet
+            if (update.creatorUsername !== username) {
+                console.log('➕ Adding new bet from:', update.creatorUsername);
+                addLiveBet(update);
+            } else {
+                console.log('⏭️ Skipping own bet');
+            }
         } else if (update.type === 'BET_ACCEPTED') {
+            console.log('Bet accepted, removing:', update.betId);
             removeLiveBet(update.betId);
+            showNotification({
+                message: `Bet #${update.betId} was accepted by ${update.acceptorUsername}`,
+                type: 'BET_ACCEPTED'
+            });
+        } else if (update.type === 'BET_MATCHED') {
+            console.log('Bet matched, removing:', update.betId);
+            removeLiveBet(update.betId);
+            showNotification({
+                message: `Bet #${update.betId} has been matched!`,
+                type: 'BET_MATCHED'
+            });
         }
     }
 
@@ -337,85 +495,173 @@
         const container = document.getElementById('liveBetsContainer');
         const noBetsMessage = document.getElementById('noBetsMessage');
         
-        // Hide "no bets" message if it's the first bet
+        if (!container) {
+            console.error('❌ liveBetsContainer not found');
+            return;
+        }
+        // Hide "no bets" message
         if (noBetsMessage) {
             noBetsMessage.style.display = 'none';
         }
         
+        // Check if bet already exists (prevent duplicates)
+        const existingBet = container.querySelector(`[data-bet-id="${betData.id}"]`);
+        if (existingBet) {
+            console.log('⏭️ Bet already exists, skipping:', betData.id);
+            return;
+        }
+        
         const betElement = document.createElement('div');
-        betElement.className = 'bet-card card mb-3';
+        betElement.className = 'bet-feed-item border-bottom p-3';
         betElement.setAttribute('data-bet-id', betData.id);
         
+            // Format the time
+        const betTime = betData.createdAt ? new Date(betData.createdAt).toLocaleTimeString() : 'Just now';
+
         betElement.innerHTML = `
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h6 class="card-title">
-                            <span class="badge bg-primary">NEW</span>
-                            ${betData.points} Points Bet
-                        </h6>
-                        <p class="card-text mb-1">
-                            <strong>Game:</strong> ${betData.gameType}<br>
-                            <strong>By:</strong> ${betData.creatorUsername}<br>
-                            <small class="text-muted">Just now</small>
-                        </p>
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-primary me-2">NEW</span>
+                        <strong class="text-success"><i class="fas fa-coins"></i> ${betData.points} Points</strong>
                     </div>
-                    <span class="badge bg-success">
-                        <i class="fas fa-coins"></i> ${betData.points}
-                    </span>
+                    <h6 class="mb-1">${betData.gameType} Challenge</h6>
+                    <p class="mb-1 text-muted small">
+                        <i class="fas fa-user"></i> Created by <strong>${betData.creatorUsername}</strong>
+                    </p>
+                    <p class="mb-0 text-muted small">
+                        <i class="fas fa-clock"></i> <span class="bet-time">${betTime}</span>
+                    </p>
                 </div>
-                <div class="mt-2">
-                    <a href="/bets/available" class="btn btn-success btn-sm">
-                        <i class="fas fa-check"></i> View & Accept
-                    </a>
+                <div class="text-end">
+                    <form action="/bets/${betData.id}/accept" method="post" 
+                        onsubmit="return confirm('Accept this ${betData.points} point ${betData.gameType} bet?')">
+                        <input type="hidden" name="_csrf" value="${getCsrfToken()}">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="fas fa-check"></i> Accept Bet
+                        </button>
+                    </form>
+                    <small class="text-muted d-block mt-1">Click to challenge!</small>
                 </div>
             </div>
         `;
         
+        // Replace the placeholder with actual Thymeleaf URL
+        const form = betElement.querySelector('form');
+        form.action = form.action.replace('__betId__', betData.id);
+        
+        // Add CSRF token dynamically
+        const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
+        if (csrfToken) {
+            const csrfInput = form.querySelector('input[name="_csrf"]');
+            if (csrfInput) {
+                csrfInput.value = csrfToken;
+            } else {
+                // Add CSRF token if not present
+                const newCsrfInput = document.createElement('input');
+                newCsrfInput.type = 'hidden';
+                newCsrfInput.name = '_csrf';
+                newCsrfInput.value = csrfToken;
+                form.appendChild(newCsrfInput);
+            }
+        }
+        
         // Add with animation
         betElement.style.opacity = '0';
+        betElement.style.transform = 'translateY(-10px)';
         container.insertBefore(betElement, container.firstChild);
         
         // Animate appearance
         setTimeout(() => {
-            betElement.style.transition = 'opacity 0.5s';
+            betElement.style.transition = 'all 0.3s ease';
             betElement.style.opacity = '1';
+            betElement.style.transform = 'translateY(0)';
         }, 100);
         
         // Update bets count
-        updateBetsCount();
+        updateLiveBetsCount();
+        
+        // Show notification (only if not current user's bet)
+        if (betData.creatorUsername !== username) {
+            showNotification({
+                message: `New ${betData.points} point ${betData.gameType} bet by ${betData.creatorUsername}!`,
+                type: 'NEW_BET'
+            });
+        }
     }
 
+    function getCsrfToken() {
+        const csrfInput = document.querySelector('input[name="_csrf"]');
+        return csrfInput ? csrfInput.value : '';
+    }
     function removeLiveBet(betId) {
         const betElement = document.querySelector(`[data-bet-id="${betId}"]`);
         if (betElement) {
-            betElement.style.transition = 'opacity 0.5s';
+            betElement.style.transition = 'all 0.3s ease';
             betElement.style.opacity = '0';
+            betElement.style.transform = 'translateY(-10px)';
             setTimeout(() => {
                 betElement.remove();
-                updateBetsCount();
-            }, 500);
+                updateLiveBetsCount();
+            }, 300);
         }
     }
 
-    function updateBetsCount() {
-        const bets = document.querySelectorAll('#liveBetsContainer .bet-card');
-        const countElement = document.getElementById('betsCount');
+    function updateLiveBetsCount() {
+        const bets = document.querySelectorAll('#liveBetsContainer .bet-feed-item');
+        const countElement = document.getElementById('liveBetsCount');
+        const noBetsMessage = document.getElementById('noBetsMessage');
+        
         if (countElement) {
-            countElement.textContent = `${bets.length} bet${bets.length !== 1 ? 's' : ''} available`;
+            countElement.textContent = `${bets.length} active bet${bets.length !== 1 ? 's' : ''}`;
+        }
+        
+        // Show "no bets" message if empty
+        if (noBetsMessage && bets.length === 0) {
+            noBetsMessage.style.display = 'block';
         }
     }
 
-    // ===== END OF NEW FUNCTIONS =====
-
-    // Initialize connection when page loads - THIS SHOULD ALREADY EXIST
+    // ===== PRE-LOAD SCRIPT =====
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 Dashboard loaded, initializing...');
+        console.log('👤 Current user:', username);
+        
+        // Pre-load existing bets from server
+        const preloadedBets = /*[[${preloadedBets}]]*/ [];
+        console.log('📥 Pre-loaded bets count:', preloadedBets.length);
+        console.log('📋 Pre-loaded bets:', preloadedBets);
+        
+        if (preloadedBets && preloadedBets.length > 0) {
+            preloadedBets.forEach(bet => {
+                // Only add bets that aren't created by current user
+            if (bet.creatorUsername !== username) {
+                    console.log('➕ Pre-loading bet:', bet.id, 'by', bet.creatorUsername);
+                    addLiveBet(bet);
+                } else {
+                    console.log('⏭️ Skipping own pre-loaded bet');
+                }
+            });
+        } else {
+            console.log('📭 No pre-loaded bets found');
+        }
+        
+        // Initialize WebSocket connection
         connect();
-        updateBetsCount(); // Add this line to initialize the count
+        
+        // Update bets count
+        updateLiveBetsCount();
+        window.scrollTo(0, 0);
+        
+        // Additional layout fix
+        setTimeout(() => {
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => {
+                document.body.style.overflow = 'auto';
+                window.dispatchEvent(new Event('resize'));
+            }, 50);
+        }, 100);
     });
-
-
-
 </script>
 </body>
 </html>

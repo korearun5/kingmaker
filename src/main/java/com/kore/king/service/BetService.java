@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -99,17 +100,27 @@ public class BetService {
     }
 
     private void broadcastNewBet(Bet bet) {
-        // Create a simplified DTO for broadcasting (to avoid sending sensitive data)
-        Map<String, Object> betMessage = new HashMap<>();
-        betMessage.put("type", "NEW_BET");
-        betMessage.put("id", bet.getId());
-        betMessage.put("points", bet.getPoints());
-        betMessage.put("gameType", bet.getGameType());
-        betMessage.put("creatorUsername", bet.getCreator().getUsername());
-        betMessage.put("createdAt", bet.getCreatedAt());
-        
-        // Broadcast to all connected users
-        messagingTemplate.convertAndSend("/topic/bet-updates", betMessage);
+        try {
+            Map<String, Object> betMessage = new HashMap<>();
+            betMessage.put("type", "NEW_BET");
+            betMessage.put("id", bet.getId());
+            betMessage.put("points", bet.getPoints());
+            betMessage.put("gameType", bet.getGameType());
+            betMessage.put("creatorUsername", bet.getCreator().getUsername());
+            betMessage.put("createdAt", bet.getCreatedAt());
+            betMessage.put("timestamp", System.currentTimeMillis());
+            
+            System.out.println("📢 Broadcasting new bet to /topic/bet-updates: " + betMessage);
+            
+            messagingTemplate.convertAndSend("/topic/bet-updates", betMessage);
+            
+            System.out.println("✅ Broadcast completed for bet: " + bet.getCreator().getUsername() + 
+                            " - " + bet.getPoints() + " points - " + bet.getGameType());
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error broadcasting bet: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void tryAutoMatch(Bet newBet) {
@@ -246,5 +257,13 @@ public Bet acceptBet(Long betId, User acceptor) {
     matchBets(existingBet, savedNewBet);
 
     return savedNewBet;
+}
+
+public List<Bet> getActiveBetsForUser(User currentUser) {
+    return betRepository.findByStatus(BetStatus.PENDING)
+            .stream()
+            // Don't filter out user's own bets - show all active bets
+            .sorted((b1, b2) -> b2.getCreatedAt().compareTo(b1.getCreatedAt()))
+            .collect(Collectors.toList());
 }
 }

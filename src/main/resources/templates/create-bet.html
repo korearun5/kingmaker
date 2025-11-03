@@ -41,6 +41,17 @@
                                 <div class="form-text">Enter the game you want to play</div>
                             </div>
 
+                            <!-- NEW: User Provided Code Field -->
+                            <div class="mb-3">
+                                <label for="userProvidedCode" class="form-label">Game/Challenge Code</label>
+                                <input type="text" class="form-control" id="userProvidedCode" 
+                                       name="userProvidedCode" placeholder="e.g., CHESS-123, ROOM-ABC, MATCH-001" required>
+                                <div class="form-text">
+                                    Enter the game code, room ID, or challenge code that you'll share with your opponent.
+                                    This could be a chess game ID, COD match code, Valorant room code, etc.
+                                </div>
+                            </div>
+
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary">Create Bet</button>
                                 <a th:href="@{/dashboard}" class="btn btn-secondary">Cancel</a>

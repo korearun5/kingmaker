@@ -10,12 +10,28 @@
             background: linear-gradient(45deg, #28a745, #20c997);
             color: white;
             border-radius: 15px;
-            padding: 20px;
+            padding: 25px;
             text-align: center;
             margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        .bet-info-card {
+        .copy-btn {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .copy-btn:hover {
+            transform: scale(1.05);
+        }
+        .status-badge {
+            font-size: 0.9em;
+            padding: 8px 15px;
+        }
+        .real-time-update {
             border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
         }
     </style>
 </head>
@@ -26,21 +42,41 @@
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="card">
-                    <div class="card-header bg-success text-white">
-                        <h4 class="mb-0"><i class="fas fa-trophy"></i> Bet Matched Successfully!</h4>
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0"><i class="fas fa-trophy"></i> Challenge Accepted!</h4>
+                        <span class="badge bg-warning status-badge" id="connectionStatus">
+                            <i class="fas fa-wifi"></i> Connecting...
+                        </span>
                     </div>
                     <div class="card-body">
                         <!-- Game Code Display -->
                         <div class="game-code-display">
                             <h5>Share This Game Code With Your Opponent</h5>
-                            <div class="display-2 fw-bold" th:text="${bet.sharedCode}">GAME1234</div>
-                            <p class="mt-3 mb-0">Both players must use this code to identify the match</p>
+                            <div class="display-2 fw-bold mb-3" id="gameCode" th:text="${bet.userProvidedCode}">
+                                GAME-123
+                            </div>
+                            <button class="btn btn-light copy-btn" onclick="copyGameCode()">
+                                <i class="fas fa-copy"></i> Copy Code
+                            </button>
+                            <div id="copyFeedback" class="text-white mt-2" style="display: none;">
+                                <i class="fas fa-check"></i> Code copied to clipboard!
+                            </div>
                         </div>
 
-                        <!-- Bet Details -->
-                        <div class="card bet-info-card mb-4">
+                        <!-- Real-time Updates Section -->
+                        <div class="real-time-update" id="realTimeUpdates">
+                            <h6><i class="fas fa-bolt"></i> Live Updates</h6>
+                            <div id="updateMessages">
+                                <div class="text-muted">Waiting for game updates...</div>
+                            </div>
+                        </div>
+
+                        <!-- Match Details -->
+                        <div class="card border-primary mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Match Details</h5>
+                            </div>
                             <div class="card-body">
-                                <h5 class="card-title">Match Details</h5>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <p><strong><i class="fas fa-gamepad"></i> Game:</strong> 
@@ -53,8 +89,8 @@
                                             <span th:if="${isCreator}" th:text="${bet.matchedBet.creator.username}">Opponent</span>
                                             <span th:unless="${isCreator}" th:text="${bet.creator.username}">Creator</span>
                                         </p>
-                                        <p><strong><i class="fas fa-clock"></i> Created:</strong> 
-                                           <span th:text="${#temporals.format(bet.createdAt, 'MMM dd, HH:mm')}">Nov 03, 22:48</span></p>
+                                        <p><strong><i class="fas fa-clock"></i> Status:</strong> 
+                                           <span class="badge bg-info" id="matchStatus">MATCHED</span></p>
                                     </div>
                                 </div>
                             </div>
@@ -65,23 +101,23 @@
                             <div class="btn-group" role="group">
                                 <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
                                    class="btn btn-primary btn-lg">
-                                    <i class="fas fa-flag-checkered"></i> Submit Game Result
+                                    <i class="fas fa-flag-checkered"></i> Submit Result
                                 </a>
                                 <a th:href="@{/dashboard}" class="btn btn-secondary btn-lg">
-                                    <i class="fas fa-home"></i> Back to Dashboard
+                                    <i class="fas fa-home"></i> Dashboard
                                 </a>
                             </div>
                         </div>
 
                         <!-- Instructions -->
                         <div class="alert alert-info mt-4">
-                            <h6><i class="fas fa-info-circle"></i> Next Steps:</h6>
+                            <h6><i class="fas fa-list-ol"></i> Next Steps:</h6>
                             <ol class="mb-0">
-                                <li>Share the game code with your opponent</li>
-                                <li>Play your <span th:text="${bet.gameType}">game</span> match</li>
-                                <li>Come back here to submit your result with screenshot proof</li>
-                                <li>Wait for your opponent to submit their result</li>
-                                <li>Points will be automatically awarded when both results match</li>
+                                <li><strong>Share the code above</strong> with your opponent</li>
+                                <li>Play your <span th:text="${bet.gameType}">game</span> match using this code</li>
+                                <li><strong>Winner</strong> submits result with screenshot proof</li>
+                                <li><strong>Loser</strong> simply acknowledges defeat (no screenshot needed)</li>
+                                <li>Points awarded automatically when both agree</li>
                             </ol>
                         </div>
                     </div>
@@ -91,5 +127,98 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const betId = /*[[${bet.id}]]*/ 0;
+        const currentUser = /*[[${user.username}]]*/ 'user';
+        /*]]>*/
+    </script>
+
+    <script>
+        let stompClient = null;
+        
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('✅ Connected to WebSocket for bet updates');
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<i class="fas fa-wifi"></i> Live Connected';
+                document.getElementById('connectionStatus').className = 'badge bg-success status-badge';
+                
+                // Subscribe to bet updates
+                stompClient.subscribe('/topic/bet-updates', function(message) {
+                    const update = JSON.parse(message.body);
+                    handleRealTimeUpdate(update);
+                });
+                
+            }, function(error) {
+                console.log('❌ WebSocket connection error');
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<i class="fas fa-wifi-slash"></i> Disconnected';
+                document.getElementById('connectionStatus').className = 'badge bg-danger status-badge';
+            });
+        }
+        
+        function handleRealTimeUpdate(update) {
+            const updatesContainer = document.getElementById('updateMessages');
+            const now = new Date().toLocaleTimeString();
+            
+            if (update.betId === betId) {
+                let message = '';
+                
+                switch(update.type) {
+                    case 'RESULT_SUBMITTED':
+                        message = `<div class="text-success">
+                            <i class="fas fa-user-check"></i> <strong>${update.username}</strong> 
+                            submitted their result: <strong>${update.result}</strong>
+                            <small class="text-muted">(${now})</small>
+                        </div>`;
+                        break;
+                        
+                    case 'BET_COMPLETED':
+                        message = `<div class="text-success fw-bold">
+                            <i class="fas fa-trophy"></i> Match Completed! 
+                            <strong>${update.winner}</strong> won ${update.points} points!
+                            <small class="text-muted">(${now})</small>
+                        </div>`;
+                        document.getElementById('matchStatus').textContent = 'COMPLETED';
+                        document.getElementById('matchStatus').className = 'badge bg-success';
+                        break;
+                }
+                
+                if (message) {
+                    // Add new message at top
+                    updatesContainer.innerHTML = message + updatesContainer.innerHTML;
+                    
+                    // Keep only last 5 messages
+                    const messages = updatesContainer.children;
+                    if (messages.length > 5) {
+                        updatesContainer.removeChild(messages[messages.length - 1]);
+                    }
+                }
+            }
+        }
+        
+        function copyGameCode() {
+            const gameCode = document.getElementById('gameCode').textContent;
+            navigator.clipboard.writeText(gameCode).then(function() {
+                const feedback = document.getElementById('copyFeedback');
+                feedback.style.display = 'block';
+                setTimeout(() => {
+                    feedback.style.display = 'none';
+                }, 2000);
+            });
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            connectWebSocket();
+        });
+    </script>
 </body>
 </html>

@@ -40,6 +40,15 @@ public class Bet {
     private Bet matchedBet; // The bet this was matched with
 
 
+    private String userProvidedCode;     // Code provided by creator
+    private String winnerUsername;       // Who won
+    private String loserUsername;        // Who lost  
+    private String winnerScreenshot;     // Only winner uploads
+    private String creatorResult;        // WIN, LOSE, or PENDING
+    private String acceptorResult;       // WIN, LOSE, or PENDING
+    private Boolean creatorSubmitted = false;
+    private Boolean acceptorSubmitted = false;
+
     public Bet() {}
 
     public Bet(User creator, Integer points, String gameType) {
@@ -106,5 +115,28 @@ public class Bet {
     }
 
 
-
+public String getUserProvidedCode() { return userProvidedCode; }
+    public void setUserProvidedCode(String userProvidedCode) { this.userProvidedCode = userProvidedCode; }
+    
+    public String getWinnerUsername() { return winnerUsername; }
+    public void setWinnerUsername(String winnerUsername) { this.winnerUsername = winnerUsername; }
+    
+    public String getLoserUsername() { return loserUsername; }
+    public void setLoserUsername(String loserUsername) { this.loserUsername = loserUsername; }
+    
+    public String getWinnerScreenshot() { return winnerScreenshot; }
+    public void setWinnerScreenshot(String winnerScreenshot) { this.winnerScreenshot = winnerScreenshot; }
+    
+    public String getCreatorResult() { return creatorResult; }
+    public void setCreatorResult(String creatorResult) { this.creatorResult = creatorResult; }
+    
+    public String getAcceptorResult() { return acceptorResult; }
+    public void setAcceptorResult(String acceptorResult) { this.acceptorResult = acceptorResult; }
+    
+    public Boolean getCreatorSubmitted() { return creatorSubmitted; }
+    public void setCreatorSubmitted(Boolean creatorSubmitted) { this.creatorSubmitted = creatorSubmitted; }
+    
+    public Boolean getAcceptorSubmitted() { return acceptorSubmitted; }
+    public void setAcceptorSubmitted(Boolean acceptorSubmitted) { this.acceptorSubmitted = acceptorSubmitted; }
 }
+

@@ -19,7 +19,6 @@ import com.kore.king.entity.User;
 import com.kore.king.service.BetService;
 import com.kore.king.service.UserService;
 
-
 @Controller
 public class DashboardController {
 
@@ -39,7 +38,7 @@ public class DashboardController {
             User user = userService.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // FIX: Get ALL available bets (not just user's bets)
+            // Get ALL available bets (not just user's bets)
             List<Bet> availableBets = betService.findAvailableBets(BetStatus.PENDING, user.getId(), Pageable.unpaged())
                 .getContent();
 
@@ -52,6 +51,7 @@ public class DashboardController {
 
             long activeBetsCount = betService.findUserActiveBetsCount(user.getId());
 
+            // Get user's matched bets
             List<Bet> userMatchedBets = betService.findUserBets(user.getId(), Pageable.unpaged())
                 .getContent()
                 .stream()
@@ -60,7 +60,7 @@ public class DashboardController {
 
             model.addAttribute("user", user);
             model.addAttribute("activeBets", activeBetsCount);
-            model.addAttribute("preloadedBets", availableBets); // FIX: Now contains ALL bets
+            model.addAttribute("preloadedBets", availableBets);
             model.addAttribute("userPendingBets", userPendingBets);
             model.addAttribute("userMatchedBets", userMatchedBets);
 
@@ -73,14 +73,27 @@ public class DashboardController {
     }
 
     @GetMapping("/create-bet")
-    public String showCreateBetForm(Model model) {
-        model.addAttribute("bet", new Bet());
-        return "create-bet";
+    public String showCreateBetForm(Authentication authentication, Model model) {
+        try {
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            model.addAttribute("user", user);
+            model.addAttribute("bet", new Bet());
+            
+            return "create-bet";
+        } catch (Exception e) {
+            System.err.println("Error in create-bet form: " + e.getMessage());
+            return "redirect:/dashboard?error";
+        }
     }
 
+    // SINGLE createBet method with userProvidedCode
     @PostMapping("/create-bet")
     public String createBet(@RequestParam Integer points,
                         @RequestParam String gameType,
+                        @RequestParam String userProvidedCode,
                         Authentication authentication,
                         RedirectAttributes redirectAttributes) {
         try {
@@ -88,18 +101,13 @@ public class DashboardController {
             User user = userService.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            Bet bet = betService.createBet(user, points, gameType);
+            Bet bet = betService.createBet(user, points, gameType, userProvidedCode);
             
-            // FIX: Broadcast new bet to ALL users via WebSocket
+            // Broadcast new bet to ALL users via WebSocket
             broadcastNewBet(bet);
             
-            if (bet.getStatus().equals("MATCHED")) {
-                redirectAttributes.addFlashAttribute("success", 
-                    "Bet created and matched! Game code: " + bet.getSharedCode());
-            } else {
-                redirectAttributes.addFlashAttribute("success", 
-                    "Bet created! Waiting for opponent...");
-            }
+            redirectAttributes.addFlashAttribute("success", 
+                "Bet created! Share the code: " + userProvidedCode + " with your opponent.");
             
             return "redirect:/dashboard";
             
@@ -109,7 +117,7 @@ public class DashboardController {
         }
     }
 
-        // NEW: Broadcast new bet to all connected users
+    // Broadcast new bet to all connected users
     private void broadcastNewBet(Bet bet) {
         try {
             java.util.Map<String, Object> message = new java.util.HashMap<>();
@@ -118,6 +126,7 @@ public class DashboardController {
             message.put("points", bet.getPoints());
             message.put("gameType", bet.getGameType());
             message.put("creatorUsername", bet.getCreator().getUsername());
+            message.put("userProvidedCode", bet.getUserProvidedCode());
             message.put("createdAt", bet.getCreatedAt());
             
             messagingTemplate.convertAndSend("/topic/bet-updates", message);

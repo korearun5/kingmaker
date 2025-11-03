@@ -53,7 +53,7 @@
                         <!-- Bet Details -->
                         <div class="alert alert-info">
                             <h5>Match Information</h5>
-                            <p><strong>Game Code:</strong> <code class="fs-5" th:text="${bet.sharedCode}">GAME1234</code></p>
+                            <p><strong>Game Code:</strong> <code class="fs-5" th:text="${bet.userProvidedCode}">GAME1234</code></p>
                             <p><strong>Game:</strong> <span th:text="${bet.gameType}">Chess</span></p>
                             <p><strong>Points:</strong> <span th:text="${bet.points}">100</span></p>
                             <p><strong>Opponent:</strong> 
@@ -105,22 +105,24 @@
                                 </div>
                             </div>
 
-                            <!-- Screenshot Upload -->
-                            <div class="mb-4">
+                            <!-- Screenshot Section -->
+                            <div class="mb-4" id="screenshotSection">
                                 <label for="screenshot" class="form-label fw-bold fs-5">
-                                    <i class="fas fa-camera"></i> Screenshot Proof
+                                    <i class="fas fa-camera"></i> Screenshot Proof 
+                                    <span class="text-danger" id="requiredStar">*</span>
+                                    <span class="badge bg-warning ms-2" id="screenshotBadge">Required for WIN</span>
                                 </label>
                                 <input type="file" class="form-control form-control-lg" id="screenshot" 
-                                       name="screenshot" accept="image/*" required 
-                                       onchange="previewImage(this)">
+                                    name="screenshot" accept="image/*" 
+                                    onchange="previewImage(this)">
                                 <div class="form-text">
-                                    Upload clear screenshot proof of the match result (required). 
-                                    This could be the final score screen, victory screen, or any proof showing the outcome.
+                                    <strong>Only required if you won:</strong> Upload clear screenshot proof of your victory.
+                                    <strong>If you lost:</strong> No screenshot needed - just select "I Lost" above.
                                 </div>
                                 
                                 <!-- Image Preview -->
                                 <img id="screenshotPreview" class="screenshot-preview" 
-                                     alt="Screenshot preview will appear here">
+                                    alt="Screenshot preview will appear here">
                             </div>
 
                             <!-- Important Information -->
@@ -166,6 +168,28 @@
             
             // Check the radio button
             document.getElementById(result.toLowerCase()).checked = true;
+            
+            // Update screenshot requirement
+            updateScreenshotRequirement(result);
+        }
+        
+        // Update screenshot requirement based on result
+        function updateScreenshotRequirement(result) {
+            const screenshotInput = document.getElementById('screenshot');
+            const requiredStar = document.getElementById('requiredStar');
+            const screenshotBadge = document.getElementById('screenshotBadge');
+            
+            if (result === 'WIN') {
+                screenshotInput.required = true;
+                requiredStar.style.display = 'inline';
+                screenshotBadge.textContent = 'Required for WIN';
+                screenshotBadge.className = 'badge bg-warning ms-2';
+            } else {
+                screenshotInput.required = false;
+                requiredStar.style.display = 'none';
+                screenshotBadge.textContent = 'Not required for LOSE';
+                screenshotBadge.className = 'badge bg-secondary ms-2';
+            }
         }
         
         // Image preview functionality
@@ -190,6 +214,7 @@
         document.querySelector('form').addEventListener('submit', function(e) {
             const resultSelected = document.querySelector('input[name="result"]:checked');
             const screenshot = document.getElementById('screenshot').files[0];
+            const winSelected = document.getElementById('win').checked;
             
             if (!resultSelected) {
                 e.preventDefault();
@@ -197,10 +222,19 @@
                 return;
             }
             
-            if (!screenshot) {
+            if (winSelected && !screenshot) {
                 e.preventDefault();
-                alert('Please upload a screenshot as proof of the match result.');
+                alert('Screenshot is required when claiming victory.');
                 return;
+            }
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if any result is already selected
+            const selectedResult = document.querySelector('input[name="result"]:checked');
+            if (selectedResult) {
+                updateScreenshotRequirement(selectedResult.value);
             }
         });
     </script>

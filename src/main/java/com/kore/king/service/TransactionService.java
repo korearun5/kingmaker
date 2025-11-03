@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.kore.king.entity.Bet;
 import com.kore.king.entity.Transaction;
 import com.kore.king.entity.TransactionType;
+import com.kore.king.entity.User;
 import com.kore.king.repository.TransactionRepository;
 
 @Service
@@ -30,6 +31,10 @@ public class TransactionService {
         Bet losingBet = winningBet.getMatchedBet();
         int points = winningBet.getPoints();
         
+        if (losingBet == null) {
+            throw new RuntimeException("No matched bet found for winning bet");
+        }
+        
         // Record points transfer from loser to winner
         Transaction winTransaction = new Transaction();
         winTransaction.setFromUser(losingBet.getCreator());
@@ -41,7 +46,16 @@ public class TransactionService {
         
         transactionRepository.save(winTransaction);
     }
-    
+        // NEW OVERLOADED METHOD: Accept User and points (for backward compatibility)
+    public void recordBetWin(User winner, int points) {
+        Transaction winTransaction = new Transaction();
+        winTransaction.setToUser(winner);
+        winTransaction.setPoints(points);
+        winTransaction.setType(TransactionType.WIN);
+        winTransaction.setDescription("Won bet - points awarded");
+        
+        transactionRepository.save(winTransaction);
+    }
     public void recordBetRefund(Bet bet) {
         Transaction transaction = new Transaction();
         transaction.setToUser(bet.getCreator());

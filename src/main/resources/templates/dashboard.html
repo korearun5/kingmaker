@@ -268,93 +268,145 @@
                     </div>
                 </div>
 
-                <!-- User's Active Matches -->
-                <div class="row mt-4" th:if="${!userMatchedBets.empty}">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h5><i class="fas fa-play-circle"></i> Your Active Matches</h5>
+<!-- User's Active Matches -->
+<div class="row mt-4" th:if="${!userMatchedBets.empty}">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-play-circle"></i> Your Active Matches</h5>
+            </div>
+            <div class="card-body p-0">
+                <div th:each="bet : ${userMatchedBets}">
+                    <div class="bet-feed-item border-bottom p-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <!-- Status badge -->
+                                    <span class="badge" 
+                                        th:class="${bet.status.name() == 'PENDING'} ? 'bg-warning' : 
+                                                   (${bet.status.name() == 'ACCEPTED'} ? 'bg-info' : 
+                                                   (${bet.status.name() == 'CODE_SHARED'} ? 'bg-success' : 'bg-secondary'))">
+                                        <span th:text="${bet.status.name()}">ACCEPTED</span>
+                                    </span>
+                                    <strong class="text-success ms-2">
+                                        <i class="fas fa-coins"></i> 
+                                        <span th:text="${bet.points}">400</span> Points
+                                    </strong>
+                                </div>
+                                <h6 class="mb-1" th:text="${bet.gameType + ' Match'}">classic Match</h6>
+                                
+                                <!-- CRITICAL: Show action-required message for User1 -->
+                                <div th:if="${bet.status.name() == 'ACCEPTED' and bet.creator.username == user.username}">
+                                    <div class="alert alert-warning p-2 mb-2">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <strong>Your action required:</strong> Share the game code with 
+                                        <span th:text="${bet.matchedBet.creator.username}">user2</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Show waiting message for User2 -->
+                                <div th:if="${bet.status.name() == 'ACCEPTED' and bet.matchedBet.creator.username == user.username}">
+                                    <div class="alert alert-info p-2 mb-2">
+                                        <i class="fas fa-clock"></i>
+                                        Waiting for <span th:text="${bet.creator.username}">user1</span> to share game code
+                                    </div>
+                                </div>
+                                
+                                <!-- Show code when available -->
+                                <div th:if="${bet.status.name() == 'CODE_SHARED'}">
+                                    <p class="mb-1 text-success">
+                                        <i class="fas fa-code"></i> 
+                                        <strong>Game Code:</strong> 
+                                        <code class="bg-light p-1 rounded" th:text="${bet.userProvidedCode}"></code>
+                                    </p>
+                                </div>
+                                
+                                <p class="mb-1 text-muted">
+                                    <i class="fas fa-user"></i> 
+                                    <span th:if="${bet.creator.username == user.username}">
+                                        Opponent: <strong th:text="${bet.matchedBet.creator.username}">user2</strong>
+                                    </span>
+                                    <span th:if="${bet.matchedBet != null and bet.matchedBet.creator.username == user.username}">
+                                        Creator: <strong th:text="${bet.creator.username}">user1</strong>
+                                    </span>
+                                </p>
+                                
+                                <p class="mb-0 text-muted small">
+                                    <i class="fas fa-clock"></i> 
+                                    <span th:text="${#temporals.format(bet.createdAt, 'MMM dd, HH:mm')}">Nov 04, 09:15</span>
+                                </p>
                             </div>
-                            <div class="card-body p-0">
-                                <div th:each="bet : ${userMatchedBets}">
-                                    <div class="bet-feed-item border-bottom p-3">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <span class="badge" 
-                                                        th:classappend="${bet.status == 'PENDING'} ? 'bg-warning' : 
-                                                                        ${bet.status == 'ACCEPTED'} ? 'bg-info' : 
-                                                                        ${bet.status == 'CODE_SHARED'} ? 'bg-success' : 'bg-secondary'"
-                                                        th:text="${bet.status}">ACCEPTED</span>
-                                                    <strong class="text-success ms-2"><i class="fas fa-coins"></i> 
-                                                        <span th:text="${bet.points}"></span> Points
-                                                    </strong>
-                                                </div>
-                                                <h6 class="mb-1" th:text="${bet.gameType + ' Match'}"></h6>
-                                                
-                                                <!-- Show appropriate messages based on status and user role -->
-                                                <th:block th:if="${bet.status == 'ACCEPTED'}">
-                                                    <th:block th:if="${bet.creator.username == user.username}">
-                                                        <p class="mb-1 text-muted small">
-                                                            <i class="fas fa-key"></i> <strong>Your action required:</strong> Set game code
-                                                        </p>
-                                                    </th:block>
-                                                    <th:block th:if="${bet.matchedBet.creator.username == user.username}">
-                                                        <p class="mb-1 text-muted small">
-                                                            <i class="fas fa-clock"></i> Waiting for creator to set game code
-                                                        </p>
-                                                    </th:block>
-                                                </th:block>
-                                                
-                                                <th:block th:if="${bet.status == 'CODE_SHARED'}">
-                                                    <p class="mb-1 text-muted small">
-                                                        <i class="fas fa-code"></i> Game Code: 
-                                                        <code th:text="${bet.userProvidedCode}"></code>
-                                                    </p>
-                                                    <p class="mb-1 text-muted small">
-                                                        <i class="fas fa-info-circle"></i> Ready to play!
-                                                    </p>
-                                                </th:block>
-                                                
-                                                <p class="mb-1 text-muted small">
-                                                    <i class="fas fa-user"></i> Opponent: 
-                                                    <span th:if="${bet.creator.username == user.username}" 
-                                                        th:text="${bet.matchedBet.creator.username}">Opponent</span>
-                                                    <span th:if="${bet.matchedBet.creator.username == user.username}" 
-                                                        th:text="${bet.creator.username}">Creator</span>
-                                                </p>
-                                            </div>
-                                            <div class="text-end">
-                                                <!-- Show appropriate buttons -->
-                                                <th:block th:if="${bet.status == 'ACCEPTED'}">
-                                                    <th:block th:if="${bet.creator.username == user.username}">
-                                                        <a th:href="@{/bets/{betId}/set-game-code(betId=${bet.id})}" 
-                                                        class="btn btn-warning btn-sm">
-                                                            <i class="fas fa-key"></i> Set Game Code
-                                                        </a>
-                                                    </th:block>
-                                                    <th:block th:if="${bet.matchedBet.creator.username == user.username}">
-                                                        <a th:href="@{/bets/{betId}/wait-for-code(betId=${bet.id})}" 
-                                                        class="btn btn-info btn-sm">
-                                                            <i class="fas fa-clock"></i> Waiting for Code
-                                                        </a>
-                                                    </th:block>
-                                                </th:block>
-                                                
-                                                <th:block th:if="${bet.status == 'CODE_SHARED'}">
-                                                    <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
-                                                    class="btn btn-primary btn-sm">
-                                                        <i class="fas fa-flag"></i> Submit Result
-                                                    </a>
-                                                </th:block>
-                                            </div>
+                            <div class="text-end">
+                                <!-- ACTION BUTTONS FOR USER1 (CREATOR) -->
+                                <div th:if="${bet.creator.username == user.username}">
+                                    <!-- SHARE CODE BUTTON - This is what User1 needs! -->
+                                    <div th:if="${bet.status.name() == 'ACCEPTED'}">
+                                        <a th:href="@{/bets/{betId}/set-game-code(betId=${bet.id})}" 
+                                           class="btn btn-warning btn-sm mb-2">
+                                            <i class="fas fa-key"></i> Share Game Code
+                                        </a>
+                                        <br>
+                                        <small class="text-muted d-block mb-2">Your opponent is waiting</small>
+                                    </div>
+                                    
+                                    <!-- SUBMIT RESULT when code is shared -->
+                                    <div th:if="${bet.status.name() == 'CODE_SHARED'}">
+                                        <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fas fa-flag"></i> Submit Result
+                                        </a>
+                                    </div>
+                                    
+                                    <!-- CANCEL OPTION -->
+                                    <form th:action="@{/bets/{betId}/cancel(betId=${bet.id})}" 
+                                          method="post" 
+                                          class="d-inline">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" 
+                                               th:value="${_csrf.token}" />
+                                        <button type="submit" 
+                                                class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('Cancel this bet? Your points will be refunded.')">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </button>
+                                    </form>
+                                </div>
+                                
+                                <!-- ACTION BUTTONS FOR USER2 (ACCEPTOR) -->
+                                <div th:if="${bet.matchedBet != null and bet.matchedBet.creator.username == user.username}">
+                                    <div th:if="${bet.status.name() == 'ACCEPTED'}">
+                                        <div class="alert alert-info p-2 mb-2">
+                                            <small>
+                                                <i class="fas fa-hourglass-half"></i>
+                                                Waiting for code...
+                                            </small>
                                         </div>
+                                        <form th:action="@{/bets/{betId}/cancel(betId=${bet.id})}" 
+                                              method="post">
+                                            <input type="hidden" th:name="${_csrf.parameterName}" 
+                                                   th:value="${_csrf.token}" />
+                                            <button type="submit" 
+                                                    class="btn btn-outline-danger btn-sm"
+                                                    onclick="return confirm('Cancel this bet? Your points will be refunded.')">
+                                                <i class="fas fa-times"></i> Cancel Wait
+                                            </button>
+                                        </form>
+                                    </div>
+                                    
+                                    <div th:if="${bet.status.name() == 'CODE_SHARED'}">
+                                        <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fas fa-flag"></i> Submit Result
+                                        </a>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
 
                 <!-- Real-Time Bet Feed -->
                 <div class="row mt-4">

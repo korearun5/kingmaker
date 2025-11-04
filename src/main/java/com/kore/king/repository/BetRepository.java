@@ -76,4 +76,12 @@ public interface BetRepository extends JpaRepository<Bet, Long> {
            "((b.creator.username = :username AND b.creatorSubmitted = true) OR " +
            "(b.matchedBet.creator.username = :username AND b.acceptorSubmitted = true))")
     boolean hasUserSubmittedResult(@Param("betId") Long betId, @Param("username") String username);
+
+    // Add these to your BetRepository interface
+    @Query("SELECT b FROM Bet b WHERE b.status = :status AND b.matchedBet.creator.id = :userId")
+    List<Bet> findByStatusAndMatchedBet_Creator_Id(@Param("status") BetStatus status, @Param("userId") Long userId);
+
+    // ADD THIS MISSING METHOD - Used in WebSocketEventHandler
+    @Query("SELECT b FROM Bet b WHERE b.matchedBet.id = :matchedBetId")
+    Optional<Bet> findByMatchedBetId(@Param("matchedBetId") Long matchedBetId);
 }

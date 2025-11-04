@@ -91,7 +91,7 @@ public class BetManagementController {
             
             Bet acceptedBet = betService.acceptBet(betId, acceptor);
             
-            // FIXED: Proper redirect logic
+            // After accepting, redirect to appropriate page based on user role
             Optional<Bet> originalBetOpt = betService.findById(betId);
             if (originalBetOpt.isPresent()) {
                 Bet originalBet = originalBetOpt.get();
@@ -104,8 +104,9 @@ public class BetManagementController {
                     return "redirect:/bets/" + acceptedBet.getId() + "/wait-for-code";
                 }
             } else {
-                // Fallback
-                return "redirect:/bets/" + acceptedBet.getId() + "/wait-for-code";
+                // Fallback to dashboard
+                redirectAttributes.addFlashAttribute("success", "Bet accepted successfully!");
+                return "redirect:/dashboard";
             }
             
         } catch (RuntimeException e) {
@@ -114,7 +115,6 @@ public class BetManagementController {
         }
     }
 
-    // Page for creator to set game code after acceptance
     @GetMapping("/{betId}/set-game-code")
     public String showSetGameCodeForm(@PathVariable Long betId, Authentication authentication, Model model) {
         try {
@@ -131,24 +131,20 @@ public class BetManagementController {
                 return "redirect:/dashboard?error=Only+creator+can+set+game+code";
             }
 
-            // FIXED: Verify bet is ACCEPTED (not MATCHED)
-            if (bet.getStatus() != BetStatus.ACCEPTED) {
-                // If code is already shared, redirect to game code page
-                if (bet.getStatus() == BetStatus.CODE_SHARED) {
-                    return "redirect:/bets/" + betId + "/game-code";
-                }
-                return "redirect:/dashboard?error=Bet+not+accepted+yet+or+already+has+code";
+            // If code is already shared, redirect to game code page
+            if (bet.getStatus() == BetStatus.CODE_SHARED && bet.getUserProvidedCode() != null && !bet.getUserProvidedCode().isEmpty()) {
+                return "redirect:/bets/" + betId + "/game-code";
             }
 
             model.addAttribute("bet", bet);
-            return "set-game-code";
+            model.addAttribute("isCreator", true);
+            return "game-code"; // Use the unified template
 
         } catch (Exception e) {
             return "redirect:/dashboard?error=" + e.getMessage();
         }
     }
 
-    // Endpoint to set game code
     @PostMapping("/{betId}/set-game-code")
     public String setGameCode(@PathVariable Long betId,
                             @RequestParam String gameCode,
@@ -156,15 +152,16 @@ public class BetManagementController {
                             RedirectAttributes redirectAttributes) {
         try {
             String username = authentication.getName();
+            
+            // Save the game code via service
             Bet updatedBet = betService.setGameCode(betId, gameCode, username);
             
-            // Broadcast code sharing via WebSocket
-            Map<String, Object> message = new HashMap<>();
-            message.put("type", "CODE_SHARED");
-            message.put("betId", betId);
-            message.put("roomCode", gameCode);
-            message.put("message", "Room code received! You can now start the game.");
-            messagingTemplate.convertAndSend("/topic/bet/" + betId, message);
+            // ALSO trigger WebSocket update
+            Map<String, String> payload = new HashMap<>();
+            payload.put("roomCode", gameCode);
+            
+            // This will trigger the WebSocketEventHandler and send to both players
+            messagingTemplate.convertAndSend("/app/bet/" + betId + "/share-code", payload);
             
             redirectAttributes.addFlashAttribute("success", 
                 "Game code set successfully! Your opponent has been notified.");
@@ -175,77 +172,88 @@ public class BetManagementController {
             return "redirect:/bets/" + betId + "/set-game-code";
         }
     }
-
-    // Page for acceptor to wait for game code
-    @GetMapping("/{betId}/wait-for-code")
-    public String showWaitForCode(@PathVariable Long betId, Authentication authentication, Model model) {
-        try {
-            Optional<Bet> betOpt = betService.findById(betId);
-            if (betOpt.isEmpty()) {
-                return "redirect:/dashboard?error=Bet+not+found";
-            }
-
-            Bet bet = betOpt.get();
-            String username = authentication.getName();
-
-            // Verify user is part of this bet (acceptor)
-            if (!isUserInBet(bet, username)) {
-                return "redirect:/dashboard?error=Not+authorized+to+view+this+bet";
-            }
-
-            // FIXED: If code is already available, redirect to game code page
-            if (bet.getStatus() == BetStatus.CODE_SHARED && bet.getUserProvidedCode() != null) {
-                return "redirect:/bets/" + betId + "/game-code";
-            }
-
-            // FIXED: If bet is not in accepted state, redirect appropriately
-            if (bet.getStatus() != BetStatus.ACCEPTED && bet.getStatus() != BetStatus.CODE_SHARED) {
-                return "redirect:/dashboard?error=Invalid+bet+state";
-            }
-
-            model.addAttribute("bet", bet);
-            return "wait-for-code";
-
-        } catch (Exception e) {
-            return "redirect:/dashboard?error=" + e.getMessage();
+// Page for acceptor to wait for game code
+@GetMapping("/{betId}/wait-for-code")
+public String showWaitForCode(@PathVariable Long betId, Authentication authentication, Model model) {
+    try {
+        Optional<Bet> betOpt = betService.findById(betId);
+        if (betOpt.isEmpty()) {
+            return "redirect:/dashboard?error=Bet+not+found";
         }
-    }
 
-    @GetMapping("/{betId}/game-code")
-    public String showGameCode(@PathVariable Long betId, Authentication authentication, Model model) {
-        try {
-            Optional<Bet> betOpt = betService.findById(betId);
-            if (betOpt.isEmpty()) {
-                return "redirect:/dashboard?error=Bet+not+found";
-            }
+        Bet bet = betOpt.get();
+        String username = authentication.getName();
 
-            Bet bet = betOpt.get();
-            String username = authentication.getName();
-
-            // Verify user is part of this bet
-            if (!isUserInBet(bet, username)) {
-                return "redirect:/dashboard?error=Not+authorized+to+view+this+bet";
-            }
-
-            // FIXED: Check if game code is available and status is CODE_SHARED
-            if (bet.getStatus() != BetStatus.CODE_SHARED || bet.getUserProvidedCode() == null) {
-                if (bet.getCreator().getUsername().equals(username)) {
-                    // Creator should set the code
-                    return "redirect:/bets/" + betId + "/set-game-code";
-                } else {
-                    // Acceptor should wait for code
-                    return "redirect:/bets/" + betId + "/wait-for-code";
-                }
-            }
-
-            model.addAttribute("bet", bet);
-            model.addAttribute("isCreator", bet.getCreator().getUsername().equals(username));
-            return "game-code";
-
-        } catch (Exception e) {
-            return "redirect:/dashboard?error=" + e.getMessage();
+        // Verify user is part of this bet (acceptor)
+        if (!isUserInBet(bet, username)) {
+            return "redirect:/dashboard?error=Not+authorized+to+view+this+bet";
         }
+
+        // If code is already available, redirect to game code page
+        if (bet.getStatus() == BetStatus.CODE_SHARED && bet.getUserProvidedCode() != null && !bet.getUserProvidedCode().isEmpty()) {
+            return "redirect:/bets/" + betId + "/game-code";
+        }
+
+        // If bet is not in accepted state, redirect appropriately
+        if (bet.getStatus() != BetStatus.ACCEPTED && bet.getStatus() != BetStatus.CODE_SHARED) {
+            return "redirect:/dashboard?error=Invalid+bet+state";
+        }
+
+        // Determine opponent username
+        String opponentUsername;
+        String waitingForUsername;
+        
+        if (bet.getCreator().getUsername().equals(username)) {
+            // Current user is the creator - opponent is the acceptor
+            opponentUsername = bet.getMatchedBet() != null ? bet.getMatchedBet().getCreator().getUsername() : "Unknown";
+            waitingForUsername = "you"; // Creator is waiting for themselves to set the code
+        } else {
+            // Current user is the acceptor - opponent is the creator
+            opponentUsername = bet.getCreator().getUsername();
+            waitingForUsername = bet.getCreator().getUsername(); // Acceptor is waiting for creator
+        }
+
+        model.addAttribute("bet", bet);
+        model.addAttribute("opponentUsername", opponentUsername);
+        model.addAttribute("waitingForUsername", waitingForUsername);
+        return "wait-for-code";
+
+    } catch (Exception e) {
+        return "redirect:/dashboard?error=" + e.getMessage();
     }
+}
+
+@GetMapping("/{betId}/game-code")
+public String showGameCode(@PathVariable Long betId, Authentication authentication, Model model) {
+    try {
+        Optional<Bet> betOpt = betService.findById(betId);
+        if (betOpt.isEmpty()) {
+            return "redirect:/dashboard?error=Bet+not+found";
+        }
+
+        Bet bet = betOpt.get();
+        String username = authentication.getName();
+
+        // Verify user is part of this bet
+        if (!isUserInBet(bet, username)) {
+            return "redirect:/dashboard?error=Not+authorized+to+view+this+bet";
+        }
+
+        boolean isCreator = bet.getCreator().getUsername().equals(username);
+        
+        // If creator hasn't set code yet and user is creator, redirect to set code
+        if (isCreator && (bet.getUserProvidedCode() == null || bet.getUserProvidedCode().isEmpty())) {
+            return "redirect:/bets/" + betId + "/set-game-code";
+        }
+
+        model.addAttribute("bet", bet);
+        model.addAttribute("isCreator", isCreator);
+        return "game-code"; // Use the unified template
+
+    } catch (Exception e) {
+        return "redirect:/dashboard?error=" + e.getMessage();
+    }
+}
 
     @GetMapping("/{betId}/submit-result")
     public String showSubmitResultForm(@PathVariable Long betId, 
@@ -266,7 +274,7 @@ public class BetManagementController {
             return "redirect:/dashboard";
         }
 
-        // FIXED: Check if bet is in CODE_SHARED status (ready for results)
+        // Check if bet is in CODE_SHARED status (ready for results)
         if (bet.getStatus() != BetStatus.CODE_SHARED) {
             model.addAttribute("error", "Game code not shared yet");
             return "redirect:/dashboard";
@@ -321,14 +329,6 @@ public class BetManagementController {
             
             betService.submitResult(betId, username, result, screenshotName, isCreator);
             
-            // Broadcast result submission
-            Map<String, Object> message = new HashMap<>();
-            message.put("type", "RESULT_SUBMITTED");
-            message.put("betId", betId);
-            message.put("username", username);
-            message.put("result", result);
-            messagingTemplate.convertAndSend("/topic/bet/" + betId, message);
-            
             String messageText = "WIN".equals(result) ? 
                 "Victory claimed! Waiting for opponent confirmation..." :
                 "Defeat acknowledged. Waiting for opponent's result...";
@@ -342,37 +342,23 @@ public class BetManagementController {
         }
     }
 
+    // CORRECTED: Fixed endpoint mapping - removed duplicate "bets"
     @PostMapping("/{betId}/cancel")
     public String cancelBet(@PathVariable Long betId,
                         Authentication authentication,
-                        Model model) {
+                        RedirectAttributes redirectAttributes) {
         try {
-            Optional<Bet> betOpt = betService.findById(betId);
-            if (betOpt.isEmpty()) {
-                return "redirect:/dashboard?error=Bet+not+found";
-            }
-
-            Bet bet = betOpt.get();
             String username = authentication.getName();
-
-            // Check if user owns this bet
-            if (!bet.getCreator().getUsername().equals(username)) {
-                return "redirect:/dashboard?error=You+can+only+cancel+your+own+bets";
-            }
-
-            betService.cancelBet(bet);
+            betService.cancelBet(betId, username);
             
-            // Broadcast cancellation
-            Map<String, Object> message = new HashMap<>();
-            message.put("type", "BET_CANCELLED");
-            message.put("betId", betId);
-            messagingTemplate.convertAndSend("/topic/bet-updates", message);
-            
-            return "redirect:/dashboard?success=Bet+cancelled+successfully";
-
+            redirectAttributes.addFlashAttribute("success", 
+                "Bet cancelled successfully. Points have been refunded.");
         } catch (Exception e) {
-            return "redirect:/dashboard?error=Error+cancelling+bet:+ " + e.getMessage();
+            redirectAttributes.addFlashAttribute("error", 
+                "Failed to cancel bet: " + e.getMessage());
         }
+        
+        return "redirect:/dashboard";
     }
 
     // Helper method to store screenshot

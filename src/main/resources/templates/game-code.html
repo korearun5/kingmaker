@@ -2,12 +2,12 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Game Code - Betting Platform</title>
+    <title>Set Game Code - Betting Platform</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .game-code-display {
-            background: linear-gradient(45deg, #28a745, #20c997);
+        .game-code-form {
+            background: linear-gradient(45deg, #007bff, #0056b3);
             color: white;
             border-radius: 15px;
             padding: 25px;
@@ -15,20 +15,9 @@
             margin: 20px 0;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        .copy-btn {
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .copy-btn:hover {
-            transform: scale(1.05);
-        }
-        .status-badge {
-            font-size: 0.9em;
-            padding: 8px 15px;
-        }
-        .real-time-update {
-            border-left: 4px solid #007bff;
-            background-color: #f8f9fa;
+        .real-time-status {
+            border-left: 4px solid #28a745;
+            background-color: #f8fff9;
             padding: 15px;
             margin: 10px 0;
             border-radius: 5px;
@@ -42,83 +31,100 @@
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="card">
-                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0"><i class="fas fa-trophy"></i> Challenge Accepted!</h4>
-                        <span class="badge bg-warning status-badge" id="connectionStatus">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0"><i class="fas fa-key"></i> Set Game Code</h4>
+                        <span class="badge bg-warning" id="connectionStatus">
                             <i class="fas fa-wifi"></i> Connecting...
                         </span>
                     </div>
                     <div class="card-body">
-                        <!-- Game Code Display -->
-                        <div class="game-code-display">
-                            <h5>Share This Game Code With Your Opponent</h5>
-                            <div class="display-2 fw-bold mb-3" id="gameCode" th:text="${bet.userProvidedCode}">
-                                GAME-123
-                            </div>
-                            <button class="btn btn-light copy-btn" onclick="copyGameCode()">
-                                <i class="fas fa-copy"></i> Copy Code
-                            </button>
-                            <div id="copyFeedback" class="text-white mt-2" style="display: none;">
-                                <i class="fas fa-check"></i> Code copied to clipboard!
-                            </div>
+                        <!-- Flash Messages -->
+                        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="fas fa-check-circle"></i> 
+                            <span th:text="${success}"></span>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
 
-                        <!-- Real-time Updates Section -->
-                        <div class="real-time-update" id="realTimeUpdates">
+                        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-circle"></i> 
+                            <span th:text="${error}"></span>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+
+                        <!-- Real-time Status -->
+                        <div class="real-time-status" id="realTimeStatus" style="display: none;">
                             <h6><i class="fas fa-bolt"></i> Live Updates</h6>
-                            <div id="updateMessages">
-                                <div class="text-muted">Waiting for game updates...</div>
-                            </div>
+                            <div id="statusMessage">Waiting for connection...</div>
                         </div>
 
-                        <!-- Match Details -->
-                        <div class="card border-primary mb-4">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Match Details</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <p><strong><i class="fas fa-gamepad"></i> Game:</strong> 
-                                           <span th:text="${bet.gameType}">Chess</span></p>
-                                        <p><strong><i class="fas fa-coins"></i> Points:</strong> 
-                                           <span th:text="${bet.points}">100</span></p>
+                        <!-- Match Information -->
+                        <div class="alert alert-info">
+                            <h5>Match Information</h5>
+                            <p><strong>Game:</strong> <span th:text="${bet.gameType}">classic</span></p>
+                            <p><strong>Points:</strong> <span th:text="${bet.points}">300</span></p>
+                            <p><strong>Opponent:</strong> 
+                                <span th:text="${bet.matchedBet.creator.username}">user2</span>
+                            </p>
+                            <p><strong>Status:</strong> 
+                                <!-- FIXED: Correct Thymeleaf syntax -->
+                                <span class="badge" 
+                                      th:class="${bet.status.name() == 'ACCEPTED'} ? 'bg-warning' : 
+                                                (${bet.status.name() == 'CODE_SHARED'} ? 'bg-success' : 'bg-info')"
+                                      th:text="${bet.status.name()}">ACCEPTED</span>
+                            </p>
+                        </div>
+
+                        <!-- Game Code Form -->
+                        <div class="game-code-form">
+                            <h5>Enter Your Game Code</h5>
+                            <p class="mb-3">Share the game code/room ID with your opponent. They will receive it instantly!</p>
+                            
+                            <form th:action="@{/bets/{betId}/set-game-code(betId=${bet.id})}" method="post" id="gameCodeForm">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <div class="mb-3">
+                                    <input type="text" class="form-control form-control-lg text-center" 
+                                           id="gameCodeInput" name="gameCode" 
+                                           placeholder="e.g., CHESS-123, ROOM-ABC, MATCH-001" 
+                                           required maxlength="50"
+                                           style="font-size: 1.2rem; font-weight: bold;">
+                                    <div class="form-text text-white">
+                                        This could be a chess game ID, COD match code, Valorant room code, etc.
                                     </div>
-                                    <div class="col-md-6">
-                                        <p><strong><i class="fas fa-user"></i> Opponent:</strong> 
-                                            <span th:if="${isCreator}" th:text="${bet.matchedBet.creator.username}">Opponent</span>
-                                            <span th:unless="${isCreator}" th:text="${bet.creator.username}">Creator</span>
-                                        </p>
-                                        <p><strong><i class="fas fa-clock"></i> Status:</strong> 
-                                           <span class="badge bg-info" id="matchStatus">MATCHED</span></p>
-                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-light btn-lg" id="shareCodeBtn">
+                                    <i class="fas fa-share"></i> Share Code Instantly
+                                </button>
+                            </form>
+
+                            <!-- Success Message -->
+                            <div id="successMessage" class="alert alert-success mt-3" style="display: none;">
+                                <i class="fas fa-check-circle"></i> 
+                                <span id="successText">Code shared successfully! Your opponent has been notified.</span>
+                                <div class="mt-2">
+                                    <a th:href="@{/bets/{betId}/game-code(betId=${bet.id})}" class="btn btn-success btn-sm">
+                                        <i class="fas fa-arrow-right"></i> Continue to Game Code Page
+                                    </a>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Action Buttons -->
-                        <div class="text-center">
-                            <div class="btn-group" role="group">
-                                <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
-                                   class="btn btn-primary btn-lg">
-                                    <i class="fas fa-flag-checkered"></i> Submit Result
-                                </a>
-                                <a th:href="@{/dashboard}" class="btn btn-secondary btn-lg">
-                                    <i class="fas fa-home"></i> Dashboard
-                                </a>
-                            </div>
+                        <!-- Instructions -->
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-info-circle"></i> Important:</h6>
+                            <ul class="mb-0">
+                                <li>Set the game code <strong>after</strong> your opponent has accepted the challenge</li>
+                                <li>Both players will see this code instantly via real-time updates</li>
+                                <li>Use this code to connect and play your match</li>
+                                <li>After setting the code, you can proceed to submit results</li>
+                            </ul>
                         </div>
 
-                        <!-- Instructions -->
-                        <div class="alert alert-info mt-4">
-                            <h6><i class="fas fa-list-ol"></i> Next Steps:</h6>
-                            <ol class="mb-0">
-                                <li><strong>Share the code above</strong> with your opponent</li>
-                                <li>Play your <span th:text="${bet.gameType}">game</span> match using this code</li>
-                                <li><strong>Winner</strong> submits result with screenshot proof</li>
-                                <li><strong>Loser</strong> simply acknowledges defeat (no screenshot needed)</li>
-                                <li>Points awarded automatically when both agree</li>
-                            </ol>
+                        <!-- Action Buttons -->
+                        <div class="text-center">
+                            <a th:href="@{/dashboard}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Dashboard
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -139,85 +145,107 @@
 
     <script>
         let stompClient = null;
-        
+        let isConnected = false;
+
         function connectWebSocket() {
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect({}, function(frame) {
-                console.log('✅ Connected to WebSocket for bet updates');
+                console.log('✅ Connected to WebSocket for bet:', betId);
+                isConnected = true;
                 document.getElementById('connectionStatus').innerHTML = 
                     '<i class="fas fa-wifi"></i> Live Connected';
-                document.getElementById('connectionStatus').className = 'badge bg-success status-badge';
+                document.getElementById('connectionStatus').className = 'badge bg-success';
                 
-                // Subscribe to bet updates
-                stompClient.subscribe('/topic/bet-updates', function(message) {
-                    const update = JSON.parse(message.body);
-                    handleRealTimeUpdate(update);
-                });
+                // Show real-time status
+                document.getElementById('realTimeStatus').style.display = 'block';
+                document.getElementById('statusMessage').innerHTML = 
+                    '<i class="fas fa-check text-success"></i> Real-time connection established. Your opponent will receive the code instantly.';
+                
+                // Join the bet room
+                stompClient.send("/app/bet/" + betId + "/join", {}, 
+                    JSON.stringify({'username': currentUser, 'socketId': 'web'}));
                 
             }, function(error) {
                 console.log('❌ WebSocket connection error');
                 document.getElementById('connectionStatus').innerHTML = 
                     '<i class="fas fa-wifi-slash"></i> Disconnected';
-                document.getElementById('connectionStatus').className = 'badge bg-danger status-badge';
+                document.getElementById('connectionStatus').className = 'badge bg-danger';
+                document.getElementById('statusMessage').innerHTML = 
+                    '<i class="fas fa-exclamation-triangle text-warning"></i> Real-time updates unavailable. Code will still be saved.';
+                document.getElementById('realTimeStatus').style.display = 'block';
             });
         }
-        
-        function handleRealTimeUpdate(update) {
-            const updatesContainer = document.getElementById('updateMessages');
-            const now = new Date().toLocaleTimeString();
+
+        function shareRoomCode() {
+            const gameCodeInput = document.getElementById('gameCodeInput');
+            const shareCodeBtn = document.getElementById('shareCodeBtn');
+            const roomCode = gameCodeInput.value.trim();
             
-            if (update.betId === betId) {
-                let message = '';
+            if (!roomCode) {
+                alert('Please enter a game code');
+                return;
+            }
+
+            // Disable button and show loading
+            shareCodeBtn.disabled = true;
+            shareCodeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sharing...';
+
+            if (isConnected) {
+                // Send via WebSocket for real-time update
+                stompClient.send("/app/bet/" + betId + "/share-code", {}, 
+                    JSON.stringify({'roomCode': roomCode}));
                 
-                switch(update.type) {
-                    case 'RESULT_SUBMITTED':
-                        message = `<div class="text-success">
-                            <i class="fas fa-user-check"></i> <strong>${update.username}</strong> 
-                            submitted their result: <strong>${update.result}</strong>
-                            <small class="text-muted">(${now})</small>
-                        </div>`;
-                        break;
-                        
-                    case 'BET_COMPLETED':
-                        message = `<div class="text-success fw-bold">
-                            <i class="fas fa-trophy"></i> Match Completed! 
-                            <strong>${update.winner}</strong> won ${update.points} points!
-                            <small class="text-muted">(${now})</small>
-                        </div>`;
-                        document.getElementById('matchStatus').textContent = 'COMPLETED';
-                        document.getElementById('matchStatus').className = 'badge bg-success';
-                        break;
-                }
-                
-                if (message) {
-                    // Add new message at top
-                    updatesContainer.innerHTML = message + updatesContainer.innerHTML;
-                    
-                    // Keep only last 5 messages
-                    const messages = updatesContainer.children;
-                    if (messages.length > 5) {
-                        updatesContainer.removeChild(messages[messages.length - 1]);
-                    }
-                }
+                // Also save via traditional form submission
+                saveGameCode(roomCode);
+            } else {
+                // Fallback: only save via traditional method
+                saveGameCode(roomCode);
             }
         }
-        
-        function copyGameCode() {
-            const gameCode = document.getElementById('gameCode').textContent;
-            navigator.clipboard.writeText(gameCode).then(function() {
-                const feedback = document.getElementById('copyFeedback');
-                feedback.style.display = 'block';
-                setTimeout(() => {
-                    feedback.style.display = 'none';
-                }, 2000);
-            });
+
+        function saveGameCode(roomCode) {
+            // Create a form and submit it to save the code
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/bets/' + betId + '/set-game-code';
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_csrf';
+            csrfInput.value = document.querySelector('input[name="_csrf"]').value;
+            
+            const codeInput = document.createElement('input');
+            codeInput.type = 'hidden';
+            codeInput.name = 'gameCode';
+            codeInput.value = roomCode;
+            
+            form.appendChild(csrfInput);
+            form.appendChild(codeInput);
+            document.body.appendChild(form);
+            
+            // Show success message
+            document.getElementById('successMessage').style.display = 'block';
+            document.getElementById('gameCodeForm').style.display = 'none';
+            
+            // Don't actually submit the form to avoid page reload
+            // form.submit();
         }
-        
+
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
             connectWebSocket();
+            
+            // Set up event listeners
+            document.getElementById('shareCodeBtn').addEventListener('click', shareRoomCode);
+            
+            // Allow Enter key to submit
+            document.getElementById('gameCodeInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    shareRoomCode();
+                }
+            });
         });
     </script>
 </body>

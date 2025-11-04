@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "bets")
@@ -52,9 +53,20 @@ public class Bet {
     @Column(name = "dispute_reason")
     private String disputeReason;
 
+    // NEW: Cancel reason field
+    @Column(name = "cancel_reason")
+    private String cancelReason;
+
     // ADD THESE NEW FIELDS FOR REAL-TIME UPDATES
     private String creatorSocketId;
     private String acceptorSocketId;
+
+    // TRANSIENT FIELDS FOR UI
+    @Transient
+    private Boolean canShareCode = false;
+    
+    @Transient
+    private Boolean canCancel = false;
 
     public Bet() {}
 
@@ -153,4 +165,14 @@ public class Bet {
     
     public String getAcceptorSocketId() { return acceptorSocketId; }
     public void setAcceptorSocketId(String acceptorSocketId) { this.acceptorSocketId = acceptorSocketId; }
+
+    public String getCancelReason() { return cancelReason; }
+    public void setCancelReason(String cancelReason) { this.cancelReason = cancelReason; }
+
+    // TRANSIENT FIELD GETTERS AND SETTERS
+    public Boolean getCanShareCode() { return canShareCode; }
+    public void setCanShareCode(Boolean canShareCode) { this.canShareCode = canShareCode; }
+    
+    public Boolean getCanCancel() { return canCancel; }
+    public void setCanCancel(Boolean canCancel) { this.canCancel = canCancel; }
 }

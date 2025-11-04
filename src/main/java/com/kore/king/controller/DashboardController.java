@@ -30,7 +30,7 @@ public class DashboardController {
 
     @Autowired
     private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
-    
+        
     @GetMapping("/dashboard")
     public String dashboard(Authentication authentication, Model model) {
         try {
@@ -38,32 +38,27 @@ public class DashboardController {
             User user = userService.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // Get ALL available bets (not just user's bets)
-            List<Bet> availableBets = betService.findAvailableBets(BetStatus.PENDING, user.getId(), Pageable.unpaged())
-                .getContent();
+            // User's own pending bets (waiting for acceptance)
+            List<Bet> userPendingBets = betService.getActiveBetsForUser(user);
 
-            // Get user's own pending bets
-            List<Bet> userPendingBets = betService.findUserBets(user.getId(), Pageable.unpaged())
+            // User's active matches (accepted bets where user is either creator or acceptor)
+            List<Bet> userMatchedBets = betService.getUserActiveMatches(user.getId());
+
+            // Get ALL available bets (not just user's bets) for the live feed
+            List<Bet> availableBets = betService.findAvailableBets(BetStatus.PENDING, user.getId(), Pageable.unpaged())
                 .getContent()
                 .stream()
-                .filter(bet -> bet.getStatus() == BetStatus.PENDING)
+                .filter(bet -> !bet.getCreator().getId().equals(user.getId())) // Exclude user's own bets
                 .collect(Collectors.toList());
 
             long activeBetsCount = betService.findUserActiveBetsCount(user.getId());
-
-            // FIXED: Get user's accepted bets (waiting for code or code shared)
-            List<Bet> userAcceptedBets = betService.findUserBets(user.getId(), Pageable.unpaged())
-                .getContent()
-                .stream()
-                .filter(bet -> bet.getStatus() == BetStatus.ACCEPTED || bet.getStatus() == BetStatus.CODE_SHARED)
-                .collect(Collectors.toList());
 
             model.addAttribute("user", user);
             model.addAttribute("activeBets", activeBetsCount);
             model.addAttribute("preloadedBets", availableBets);
             model.addAttribute("userPendingBets", userPendingBets);
-            model.addAttribute("userMatchedBets", userAcceptedBets); // Now using accepted bets
-
+            model.addAttribute("userMatchedBets", userMatchedBets);
+            
             return "dashboard";
         } catch (Exception e) {
             System.err.println("Error in dashboard: " + e.getMessage());

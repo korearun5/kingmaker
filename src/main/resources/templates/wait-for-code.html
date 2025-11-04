@@ -41,6 +41,14 @@
             50% { transform: scale(1.02); }
             100% { transform: scale(1); }
         }
+        .cancel-section {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -65,6 +73,18 @@
                             <p class="mb-0"><small>You'll be notified instantly when it's ready!</small></p>
                         </div>
 
+                        <!-- Debug Information -->
+                        <div class="alert alert-info mt-3">
+                            <h6>Debug Information:</h6>
+                            <p><strong>Your Bet ID:</strong> <span th:text="${bet.id}">?</span></p>
+                            <p><strong>Your Role:</strong> 
+                                <span th:if="${bet.creator.username == user.username}">Creator</span>
+                                <span th:unless="${bet.creator.username == user.username}">Acceptor</span>
+                            </p>
+                            <p><strong>Opponent:</strong> <span th:text="${opponentUsername}">?</span></p>
+                            <p><strong>Waiting for:</strong> <span th:text="${waitingForUsername}">?</span> to share code</p>
+                        </div>
+
                         <!-- Code Received Section (hidden initially) -->
                         <div class="code-received" id="codeReceivedSection" style="display: none;">
                             <h3><i class="fas fa-check-circle"></i> Code Received!</h3>
@@ -84,13 +104,13 @@
                                 <div class="row">
                                     <div class="col-md-6">
                                         <p><strong><i class="fas fa-gamepad"></i> Game:</strong> 
-                                           <span th:text="${bet.gameType}">Chess</span></p>
+                                           <span th:text="${bet.gameType}">classic</span></p>
                                         <p><strong><i class="fas fa-coins"></i> Points:</strong> 
-                                           <span th:text="${bet.points}">100</span></p>
+                                           <span th:text="${bet.points}">300</span></p>
                                     </div>
                                     <div class="col-md-6">
                                         <p><strong><i class="fas fa-user"></i> Opponent:</strong> 
-                                           <span th:text="${bet.creator.username}">Creator</span></p>
+                                           <span th:text="${opponentUsername}">user1</span></p>
                                         <p><strong><i class="fas fa-clock"></i> Status:</strong> 
                                            <span class="badge bg-warning" id="statusBadge">WAITING FOR CODE</span></p>
                                     </div>
@@ -102,16 +122,29 @@
                         <div class="alert alert-info" id="realTimeUpdates">
                             <h6><i class="fas fa-bolt"></i> Live Updates</h6>
                             <div id="updateMessages">
-                                <div class="text-muted">Waiting for game code to be set by <strong th:text="${bet.creator.username}">Creator</strong>...</div>
+                                <div class="text-muted">Waiting for game code to be set by <strong th:text="${waitingForUsername}">user1</strong>...</div>
                             </div>
+                        </div>
+
+                        <!-- Cancel Option for Acceptor -->
+                        <div class="cancel-section" th:if="${bet.creator.username != user.username}">
+                            <h5><i class="fas fa-exclamation-triangle"></i> Taking too long?</h5>
+                            <p class="mb-3">If the creator doesn't share the game code soon, you can cancel this bet and get your points back.</p>
+                            <form th:action="@{/bets/{betId}/cancel(betId=${bet.id})}" method="post" class="d-inline">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <button type="submit" class="btn btn-light btn-lg"
+                                        onclick="return confirm('Are you sure you want to cancel this bet? Your points will be refunded.')">
+                                    <i class="fas fa-times-circle"></i> Cancel Bet & Get Points Back
+                                </button>
+                            </form>
                         </div>
 
                         <!-- Instructions -->
                         <div class="alert alert-secondary">
                             <h6><i class="fas fa-list-ol"></i> What's Happening:</h6>
                             <ol class="mb-0">
-                                <li>You've accepted the challenge from <strong th:text="${bet.creator.username}">Creator</strong></li>
-                                <li>The bet creator is setting up the game/room</li>
+                                <li>You've accepted the challenge from <strong th:text="${opponentUsername}">user1</strong></li>
+                                <li>The bet creator (<strong th:text="${waitingForUsername}">user1</strong>) is setting up the game/room</li>
                                 <li>Once they set the code, it will appear here <strong>automatically</strong></li>
                                 <li>You'll then be able to join the game and play</li>
                                 <li>After the match, submit your result</li>
@@ -139,54 +172,109 @@
 
     <script th:inline="javascript">
         /*<![CDATA[*/
-        const betId = /*[[${bet.id}]]*/ 0;
+        const currentBetId = /*[[${bet.id}]]*/ '0';
         const currentUser = /*[[${user.username}]]*/ 'user';
+        const opponentUsername = /*[[${opponentUsername}]]*/ 'opponent';
+        
+        // Get the original bet ID correctly
+        let originalBetId = /*[[${bet.matchedBet?.id}]]*/ null;
+        if (!originalBetId) {
+            // If no matchedBet, try to get it from the relationship
+            originalBetId = currentBetId; // fallback to current bet
+        }
         /*]]>*/
     </script>
 
     <script>
         let stompClient = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
         
         function connectWebSocket() {
+            console.log('🚀 Connecting WebSocket...');
+            console.log('📊 Initial state - Current Bet ID:', currentBetId, 'Original Bet ID:', originalBetId, 'User:', currentUser);
+            
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect({}, function(frame) {
                 console.log('✅ Connected to WebSocket for game code updates');
+                console.log('📡 Bet IDs - Current:', currentBetId, 'Original:', originalBetId);
+                console.log('👤 Current user:', currentUser, 'Opponent:', opponentUsername);
+                
+                reconnectAttempts = 0; // Reset reconnect counter on successful connection
+                
                 document.getElementById('connectionStatus').innerHTML = 
                     '<i class="fas fa-wifi"></i> Live Connected';
                 document.getElementById('connectionStatus').className = 'badge bg-success';
                 
-                // Subscribe to bet updates
-                stompClient.subscribe('/topic/bet/' + betId, function(message) {
+                // Subscribe to current bet (acceptor's bet)
+                stompClient.subscribe('/topic/bet/' + currentBetId, function(message) {
+                    console.log('📨 Received message on current bet topic ' + currentBetId + ':', message.body);
                     const update = JSON.parse(message.body);
                     handleRealTimeUpdate(update);
                 });
                 
-                // Join the bet room
-                stompClient.send("/app/bet/" + betId + "/join", {}, 
+                // ALSO subscribe to original bet (creator's bet) if different and exists
+                if (originalBetId && originalBetId !== currentBetId) {
+                    stompClient.subscribe('/topic/bet/' + originalBetId, function(message) {
+                        console.log('📨 Received message on original bet topic ' + originalBetId + ':', message.body);
+                        const update = JSON.parse(message.body);
+                        handleRealTimeUpdate(update);
+                    });
+                    console.log('✅ Subscribed to both bet topics:', currentBetId, 'and', originalBetId);
+                } else {
+                    console.log('ℹ️  Only subscribed to current bet topic:', currentBetId);
+                }
+                
+                // Join the bet room with CORRECT bet ID
+                stompClient.send("/app/bet/" + currentBetId + "/join", {}, 
                     JSON.stringify({'username': currentUser, 'socketId': 'web'}));
+                console.log('🔵 Joined bet room:', currentBetId);
                 
             }, function(error) {
-                console.log('❌ WebSocket connection error');
+                console.log('❌ WebSocket connection error:', error);
                 document.getElementById('connectionStatus').innerHTML = 
                     '<i class="fas fa-wifi-slash"></i> Disconnected';
                 document.getElementById('connectionStatus').className = 'badge bg-danger';
+                
+                // Attempt to reconnect with exponential backoff
+                reconnectAttempts++;
+                if (reconnectAttempts <= maxReconnectAttempts) {
+                    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Max 30 seconds
+                    console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+                    setTimeout(connectWebSocket, delay);
+                } else {
+                    console.log('❌ Max reconnection attempts reached. Using fallback polling.');
+                    // Fallback: check every 5 seconds if code is available
+                    setInterval(checkCodeStatus, 5000);
+                }
             });
         }
         
         function handleRealTimeUpdate(update) {
-            console.log('Received update:', update);
+            console.log('🔄 Received update:', update);
             
             if (update.type === 'CODE_SHARED') {
+                console.log('🎮 Code received via WebSocket:', update.roomCode);
                 showCodeReceived(update.roomCode);
+            } else if (update.type === 'JOINED') {
+                console.log('👋 User joined:', update.username);
             }
         }
         
         function showCodeReceived(roomCode) {
+            console.log('🎯 Showing code received UI');
+            
             // Hide waiting section, show code received section
             document.getElementById('waitingSection').style.display = 'none';
             document.getElementById('codeReceivedSection').style.display = 'block';
+            
+            // Hide cancel section when code is received
+            const cancelSection = document.querySelector('.cancel-section');
+            if (cancelSection) {
+                cancelSection.style.display = 'none';
+            }
             
             // Update the code display
             document.getElementById('receivedCode').textContent = roomCode;
@@ -199,16 +287,58 @@
             document.getElementById('updateMessages').innerHTML = 
                 '<div class="text-success"><i class="fas fa-check-circle"></i> ' +
                 'Game code received! You can now join the match.</div>';
+                
+            console.log('✅ UI updated with code:', roomCode);
+            
+            // Show success notification
+            showNotification('Game code received!', 'success');
         }
         
         function checkCodeStatus() {
+            console.log('🔄 Manual check for code');
             // Manual check by reloading the page
             window.location.reload();
+        }
+        
+        function showNotification(message, type) {
+            // Create a simple notification
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+            notification.innerHTML = `
+                <strong>${type === 'success' ? '✅' : '⚠️'} ${message}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
         }
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Page loaded, initializing WebSocket...');
+            console.log('📊 Initial state - Bet ID:', currentBetId, 'User:', currentUser);
+            
+            // Check if we already have a code (in case page was reloaded after code was shared)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('code')) {
+                showCodeReceived(urlParams.get('code'));
+            }
+            
             connectWebSocket();
+        });
+
+        // Handle page visibility change (reconnect when page becomes visible)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && (!stompClient || !stompClient.connected)) {
+                console.log('🔍 Page became visible, reconnecting WebSocket...');
+                connectWebSocket();
+            }
         });
     </script>
 </body>

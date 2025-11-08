@@ -1,6 +1,5 @@
 package com.kore.king.service;
 
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,50 +19,54 @@ public class TransactionService {
         Transaction transaction = new Transaction();
         transaction.setFromUser(bet.getCreator());
         transaction.setPoints(bet.getPoints());
-        transaction.setType(TransactionType.CREATION);
+        transaction.setType(TransactionType.BET_CREATION);
         transaction.setBet(bet);
-        transaction.setDescription("Bet creation for " + bet.getGameType());
+        transaction.setDescription("Bet creation - " + bet.getTitle());
         
         transactionRepository.save(transaction);
     }
     
-    public void recordBetWin(Bet winningBet) {
-        Bet losingBet = winningBet.getMatchedBet();
-        int points = winningBet.getPoints();
-        
-        if (losingBet == null) {
-            throw new RuntimeException("No matched bet found for winning bet");
-        }
-        
-        // Record points transfer from loser to winner
-        Transaction winTransaction = new Transaction();
-        winTransaction.setFromUser(losingBet.getCreator());
-        winTransaction.setToUser(winningBet.getCreator());
-        winTransaction.setPoints(points * 2); // Winner gets both stakes
-        winTransaction.setType(TransactionType.WIN);
-        winTransaction.setBet(winningBet);
-        winTransaction.setDescription("Won bet against " + losingBet.getCreator().getUsername());
-        
-        transactionRepository.save(winTransaction);
-    }
-        // NEW OVERLOADED METHOD: Accept User and points (for backward compatibility)
-    public void recordBetWin(User winner, int points) {
-        Transaction winTransaction = new Transaction();
-        winTransaction.setToUser(winner);
-        winTransaction.setPoints(points);
-        winTransaction.setType(TransactionType.WIN);
-        winTransaction.setDescription("Won bet - points awarded");
-        
-        transactionRepository.save(winTransaction);
-    }
-    public void recordBetRefund(Bet bet) {
+    public void recordBetAcceptance(Bet bet) {
         Transaction transaction = new Transaction();
-        transaction.setToUser(bet.getCreator());
+        transaction.setFromUser(bet.getAcceptor());
         transaction.setPoints(bet.getPoints());
-        transaction.setType(TransactionType.REFUND);
+        transaction.setType(TransactionType.BET_ACCEPTANCE);
         transaction.setBet(bet);
-        transaction.setDescription("Bet cancellation refund");
+        transaction.setDescription("Bet acceptance - " + bet.getTitle());
         
         transactionRepository.save(transaction);
+    }
+    
+    public void recordBetWin(Bet bet, User winner) {
+        Transaction transaction = new Transaction();
+        transaction.setToUser(winner);
+        transaction.setPoints(bet.getPoints() * 2); // Winner gets both stakes
+        transaction.setType(TransactionType.WIN);
+        transaction.setBet(bet);
+        transaction.setDescription("Won bet - " + bet.getTitle());
+        
+        transactionRepository.save(transaction);
+    }
+    
+    public void recordBetRefund(Bet bet) {
+        // Refund creator
+        Transaction creatorRefund = new Transaction();
+        creatorRefund.setToUser(bet.getCreator());
+        creatorRefund.setPoints(bet.getPoints());
+        creatorRefund.setType(TransactionType.REFUND);
+        creatorRefund.setBet(bet);
+        creatorRefund.setDescription("Bet cancellation refund - " + bet.getTitle());
+        transactionRepository.save(creatorRefund);
+        
+        // Refund acceptor if exists
+        if (bet.getAcceptor() != null) {
+            Transaction acceptorRefund = new Transaction();
+            acceptorRefund.setToUser(bet.getAcceptor());
+            acceptorRefund.setPoints(bet.getPoints());
+            acceptorRefund.setType(TransactionType.REFUND);
+            acceptorRefund.setBet(bet);
+            acceptorRefund.setDescription("Bet cancellation refund - " + bet.getTitle());
+            transactionRepository.save(acceptorRefund);
+        }
     }
 }

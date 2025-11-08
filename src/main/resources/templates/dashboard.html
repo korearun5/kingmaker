@@ -2,607 +2,665 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard - Betting Platform</title>
+    <title>BetKing - Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* FIX: Reset all margins and padding for clean layout */
-        * {
-            box-sizing: border-box;
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
         }
         
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow-x: hidden;
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
-        .dashboard-container {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+        .navbar-brand {
+            font-weight: bold;
+            color: var(--primary) !important;
         }
         
-        .sidebar {
-            min-height: 100vh;
-            background-color: #343a40;
-            position: sticky;
-            top: 0;
-        }
-        
-        .sidebar .nav-link {
-            color: #fff;
-        }
-        
-        .sidebar .nav-link:hover {
-            background-color: #495057;
-        }
-        
-        .main-content {
-            flex: 1;
-            min-height: calc(100vh - 76px);
-            padding-bottom: 20px;
-        }
-        
-        .points-display {
-            background: linear-gradient(45deg, #28a745, #20c997);
+        .points-badge {
+            background: linear-gradient(45deg, var(--success), #2ecc71);
             color: white;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
         }
         
         .bet-card {
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            margin-bottom: 15px;
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             transition: transform 0.2s;
+            margin-bottom: 1rem;
         }
         
         .bet-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
         }
         
-        .bet-feed-item {
-            border-bottom: 1px solid #eee;
-            transition: all 0.3s ease;
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 10px;
         }
         
-        .bet-feed-item:hover {
-            background-color: #f8f9fa;
+        .action-btn {
+            border-radius: 20px;
+            padding: 6px 15px;
+            font-size: 0.875rem;
+            font-weight: 500;
         }
         
-        .bet-feed-item:last-child {
-            border-bottom: none;
+        .live-feed {
+            max-height: 500px;
+            overflow-y: auto;
         }
         
-        /* FIX: Ensure proper container behavior */
-        .container-fluid {
-            padding: 0;
-            margin: 0;
+        .tab-content {
+            background: white;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-height: 400px;
         }
         
-        .row {
-            margin: 0;
+        .nav-tabs .nav-link {
+            border: none;
+            color: var(--primary);
+            font-weight: 500;
+            padding: 12px 20px;
         }
         
-        /* FIX: Remove any default padding that might cause offset */
-        main {
-            padding-top: 0;
-            min-height: calc(100vh - 76px);
+        .nav-tabs .nav-link.active {
+            background: white;
+            border-bottom: 3px solid var(--secondary);
+            color: var(--secondary);
         }
         
-        /* FIX: Ensure flash messages don't create extra space */
-        .alert {
-            margin-bottom: 0;
-            border-radius: 0;
+        .game-code {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px dashed #dee2e6;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-align: center;
         }
     </style>
 </head>
-<body class="dashboard-container">
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <h4 class="text-white text-center mb-4">Betting Platform</h4>
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link active" th:href="@{/dashboard}">
-                                <i class="fas fa-home"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" th:href="@{/create-bet}">
-                                <i class="fas fa-plus-circle"></i> Create Bet
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" th:href="@{/my-bets}">
-                                <i class="fas fa-history"></i> My Bets
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">
-                                <i class="fas fa-cog"></i> Settings
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <form th:action="@{/logout}" method="post">
-                                <button type="submit" class="nav-link btn btn-link text-start w-100">
-                                    <i class="fas fa-sign-out-alt"></i> Logout
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-crown me-2"></i>BetKing
+            </a>
+            
+            <div class="d-flex align-items-center">
+                <div class="points-badge me-3">
+                    <i class="fas fa-coins me-1"></i>
+                    <span th:text="${user?.availablePoints}">1000</span> Points
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user me-1"></i>
+                        <span th:text="${user?.username}">User</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#profileModal">
+                            <i class="fas fa-user-circle me-2"></i>Profile
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form th:action="@{/logout}" method="post" class="d-inline">
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
                                 </button>
                             </form>
                         </li>
                     </ul>
                 </div>
-            </nav>
+            </div>
+        </div>
+    </nav>
 
-            <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <!-- Flash Messages -->
-                <div th:if="${success}" class="alert alert-success alert-dismissible fade show mt-0" role="alert">
-                    <i class="fas fa-check-circle"></i> 
-                    <span th:text="${success}"></span>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
 
-                <div th:if="${error}" class="alert alert-danger alert-dismissible fade show mt-0" role="alert">
-                    <i class="fas fa-exclamation-circle"></i> 
-                    <span th:text="${error}"></span>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
 
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="points-display">
-                            <h4><i class="fas fa-coins"></i> Your Points: <span th:text="${user?.points}">1000</span></h4>
-                        </div>
+        <!-- Quick Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bet-card text-white" style="background: linear-gradient(45deg, #3498db, #2980b9);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-bolt fa-2x mb-2"></i>
+                        <h5>Active Bets</h5>
+                        <h2 th:text="${userActiveBets?.size() ?: '0'}">0</h2>
                     </div>
                 </div>
-
-                <!-- Quick Stats -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card text-white bg-primary">
-                            <div class="card-body">
-                                <h5 class="card-title">Active Bets</h5>
-                                <h2 th:text="${activeBets} ?: '0'">0</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-white bg-success">
-                            <div class="card-body">
-                                <h5 class="card-title">Wins</h5>
-                                <h2>0</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-white bg-warning">
-                            <div class="card-body">
-                                <h5 class="card-title">Pending</h5>
-                                <h2>0</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-white bg-info">
-                            <div class="card-body">
-                                <h5 class="card-title">Total Bets</h5>
-                                <h2>0</h2>
-                            </div>
-                        </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bet-card text-white" style="background: linear-gradient(45deg, #27ae60, #229954);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-trophy fa-2x mb-2"></i>
+                        <h5>Wins</h5>
+                        <h2 th:text="${user?.wins ?: '0'}">0</h2>
                     </div>
                 </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bet-card text-white" style="background: linear-gradient(45deg, #e67e22, #d35400);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h5>In Progress</h5>
+                        <h2 th:text="${inProgressBets?.size() ?: '0'}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bet-card text-white" style="background: linear-gradient(45deg, #9b59b6, #8e44ad);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <h5>Total Earned</h5>
+                        <h2 th:text="${(user?.availablePoints ?: 1000) - 1000}">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                <!-- Quick Actions -->
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Quick Actions</h5>
+        <!-- Main Tabs -->
+        <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="play-tab" data-bs-toggle="tab" data-bs-target="#play" type="button">
+                    <i class="fas fa-gamepad me-2"></i>Play Game
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button">
+                    <i class="fas fa-history me-2"></i>History
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content p-4" id="mainTabsContent">
+            <!-- Play Game Tab -->
+            <div class="tab-pane fade show active" id="play" role="tabpanel">
+                <div class="row">
+                    <!-- Create Bet Section -->
+                    <div class="col-md-4">
+                        <div class="card bet-card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Create New Bet</h5>
                             </div>
                             <div class="card-body">
-                                <a th:href="@{/create-bet}" class="btn btn-primary me-2">
-                                    <i class="fas fa-plus"></i> Create New Bet
-                                </a>
-                                <a th:href="@{/my-bets}" class="btn btn-info me-2">
-                                    <i class="fas fa-history"></i> My Bets
-                                </a>
-                                <a href="#" class="btn btn-secondary">
-                                    <i class="fas fa-chart-bar"></i> Leaderboard
-                                </a>
+                                <form th:action="@{/create-bet}" method="post">
+                                    <div class="mb-3">
+                                        <label class="form-label">Game Type</label>
+                                        <select name="gameType" class="form-select" required>
+                                            <option value="classic">Classic</option>
+                                            <option value="popular">Popular</option>
+                                            <option value="challenge">Challenge</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Points to Bet</label>
+                                        <input type="number" name="points" class="form-control" 
+                                               min="10" max="1000" value="100" required>
+                                        <div class="form-text">Min: 10, Max: 1000 points</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Title</label>
+                                        <input type="text" name="title" class="form-control" 
+                                               placeholder="Enter bet title" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100 action-btn">
+                                        <i class="fas fa-rocket me-2"></i>Create Bet
+                                    </button>
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Active Bets -->
+                        <div class="card bet-card mt-4">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Your Active Bets</h5>
+                            </div>
+                            <div class="card-body">
+                                <div th:if="${userActiveBets?.empty}" class="text-center text-muted py-3">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                                    <p>No active bets</p>
+                                </div>
+                                <div th:each="bet : ${userActiveBets}" class="mb-3 p-3 border rounded">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="status-badge" 
+                                              th:classappend="${(bet.status.name() == 'COMPLETED') ? 'badge bg-success' : (bet.status.name() == 'CANCELLED') ? 'badge bg-secondary' : (bet.status.name() == 'DISPUTED') ? 'badge bg-warning' : 'badge bg-info'}"
+                                              th:text="${bet.status.name()}">
+                                        </span>
+                                        <strong class="text-primary" th:text="'₱' + ${bet.points}"></strong>
+                                    </div>
+                                    <h6 th:text="${bet.title} ?: ${bet.gameType + ' Match'}"></h6>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <th:block th:if="${bet.status.name() == 'PENDING'}">
+                                            <form th:action="@{/bets/{id}/cancel(id=${bet.id})}" method="post" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm action-btn"
+                                                        onclick="return confirm('Cancel this bet?')">
+                                                    Cancel
+                                                </button>
+                                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                            </form>
+                                        </th:block>
+                                        <th:block th:if="${bet.status.name() == 'ACCEPTED' && bet.creator.username == user.username}">
+                                            <button class="btn btn-warning btn-sm action-btn" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#shareCodeModal"
+                                                    th:data-bet-id="${bet.id}">
+                                                Share Code
+                                            </button>
+                                        </th:block>
+                                        <th:block th:if="${bet.status.name() == 'CODE_SHARED'}">
+                                            <button class="btn btn-primary btn-sm action-btn"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#submitResultModal"
+                                                    th:data-bet-id="${bet.id}">
+                                                Submit Result
+                                            </button>
+                                        </th:block>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- User's Own Active Bets -->
-                <div class="row mt-4" th:if="${!userPendingBets.empty}">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5><i class="fas fa-clock"></i> Your Active Bets</h5>
-                                <small class="text-muted" th:text="${userPendingBets.size() + ' waiting for opponent'}"></small>
+                    <!-- Live Betting Feed -->
+                    <div class="col-md-8">
+                        <div class="card bet-card">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Live Betting Feed</h5>
+                                <span class="badge bg-light text-dark" id="liveBetsCount">0 bets</span>
                             </div>
                             <div class="card-body p-0">
-                                <div th:each="bet : ${userPendingBets}">
-                                    <div class="bet-feed-item border-bottom p-3">
+                                <div id="liveBetsContainer" class="live-feed">
+                                    <div th:each="bet : ${availableBets}" class="p-3 border-bottom">
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div class="flex-grow-1">
                                                 <div class="d-flex align-items-center mb-2">
-                                                    <span class="badge bg-warning me-2">WAITING</span>
-                                                    <strong class="text-info"><i class="fas fa-coins"></i> 
-                                                        <span th:text="${bet.points}"></span> Points
-                                                    </strong>
+                                                    <span class="badge bg-primary me-2">NEW</span>
+                                                    <strong class="text-success" th:text="'₱' + ${bet.points}"></strong>
                                                 </div>
-                                                <h6 class="mb-1" th:text="${bet.gameType + ' Challenge'}"></h6>
+                                                <h6 th:text="${bet.title} ?: ${bet.gameType + ' Challenge'}"></h6>
                                                 <p class="mb-1 text-muted small">
-                                                    <i class="fas fa-user-clock"></i> Waiting for opponent to accept...
+                                                    <i class="fas fa-user me-1"></i>
+                                                    <span th:text="${bet.creator.username}"></span>
                                                 </p>
                                                 <p class="mb-0 text-muted small">
-                                                    <i class="fas fa-clock"></i> 
+                                                    <i class="fas fa-clock me-1"></i>
                                                     <span th:text="${#temporals.format(bet.createdAt, 'MMM dd, HH:mm')}"></span>
                                                 </p>
                                             </div>
                                             <div class="text-end">
-                                                <form th:action="@{/bets/{betId}/cancel(betId=${bet.id})}" method="post">
-                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                                                    <button type="submit" class="btn btn-outline-danger btn-sm" 
-                                                            onclick="return confirm('Cancel this bet?')">
-                                                        <i class="fas fa-times"></i> Cancel
+                                                <form th:action="@{/bets/{id}/accept(id=${bet.id})}" method="post">
+                                                    <button type="submit" class="btn btn-success btn-sm action-btn"
+                                                            th:onclick="|return confirm('Accept this ' + ${bet.points} + ' point bet?')|">
+                                                        <i class="fas fa-check me-1"></i>Accept
                                                     </button>
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                                                 </form>
-                                                <small class="text-muted d-block mt-1">You created this bet</small>
                                             </div>
                                         </div>
                                     </div>
+                                    <div th:if="${availableBets?.empty}" class="text-center text-muted py-5">
+                                        <i class="fas fa-search fa-2x mb-2"></i>
+                                        <p>No active bets available</p>
+                                        <p class="small">Create the first bet to get started!</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-<!-- User's Active Matches -->
-<div class="row mt-4" th:if="${!userMatchedBets.empty}">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h5><i class="fas fa-play-circle"></i> Your Active Matches</h5>
-            </div>
-            <div class="card-body p-0">
-                <div th:each="bet : ${userMatchedBets}">
-                    <div class="bet-feed-item border-bottom p-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="d-flex align-items-center mb-2">
-                                    <!-- Status badge -->
-                                    <span class="badge" 
-                                        th:class="${bet.status.name() == 'PENDING'} ? 'bg-warning' : 
-                                                   (${bet.status.name() == 'ACCEPTED'} ? 'bg-info' : 
-                                                   (${bet.status.name() == 'CODE_SHARED'} ? 'bg-success' : 'bg-secondary'))">
-                                        <span th:text="${bet.status.name()}">ACCEPTED</span>
-                                    </span>
-                                    <strong class="text-success ms-2">
-                                        <i class="fas fa-coins"></i> 
-                                        <span th:text="${bet.points}">400</span> Points
-                                    </strong>
-                                </div>
-                                <h6 class="mb-1" th:text="${bet.gameType + ' Match'}">classic Match</h6>
-                                
-                                <!-- CRITICAL: Show action-required message for User1 -->
-                                <div th:if="${bet.status.name() == 'ACCEPTED' and bet.creator.username == user.username}">
-                                    <div class="alert alert-warning p-2 mb-2">
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                        <strong>Your action required:</strong> Share the game code with 
-                                        <span th:text="${bet.matchedBet.creator.username}">user2</span>
-                                    </div>
-                                </div>
-                                
-                                <!-- Show waiting message for User2 -->
-                                <div th:if="${bet.status.name() == 'ACCEPTED' and bet.matchedBet.creator.username == user.username}">
-                                    <div class="alert alert-info p-2 mb-2">
-                                        <i class="fas fa-clock"></i>
-                                        Waiting for <span th:text="${bet.creator.username}">user1</span> to share game code
-                                    </div>
-                                </div>
-                                
-                                <!-- Show code when available -->
-                                <div th:if="${bet.status.name() == 'CODE_SHARED'}">
-                                    <p class="mb-1 text-success">
-                                        <i class="fas fa-code"></i> 
-                                        <strong>Game Code:</strong> 
-                                        <code class="bg-light p-1 rounded" th:text="${bet.userProvidedCode}"></code>
-                                    </p>
-                                </div>
-                                
-                                <p class="mb-1 text-muted">
-                                    <i class="fas fa-user"></i> 
-                                    <span th:if="${bet.creator.username == user.username}">
-                                        Opponent: <strong th:text="${bet.matchedBet.creator.username}">user2</strong>
-                                    </span>
-                                    <span th:if="${bet.matchedBet != null and bet.matchedBet.creator.username == user.username}">
-                                        Creator: <strong th:text="${bet.creator.username}">user1</strong>
-                                    </span>
-                                </p>
-                                
-                                <p class="mb-0 text-muted small">
-                                    <i class="fas fa-clock"></i> 
-                                    <span th:text="${#temporals.format(bet.createdAt, 'MMM dd, HH:mm')}">Nov 04, 09:15</span>
-                                </p>
+                        <!-- In Progress Matches -->
+                        <div class="card bet-card mt-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-play-circle me-2"></i>Matches in Progress</h5>
                             </div>
-                            <div class="text-end">
-                                <!-- ACTION BUTTONS FOR USER1 (CREATOR) -->
-                                <div th:if="${bet.creator.username == user.username}">
-                                    <!-- SHARE CODE BUTTON - This is what User1 needs! -->
-                                    <div th:if="${bet.status.name() == 'ACCEPTED'}">
-                                        <a th:href="@{/bets/{betId}/set-game-code(betId=${bet.id})}" 
-                                           class="btn btn-warning btn-sm mb-2">
-                                            <i class="fas fa-key"></i> Share Game Code
-                                        </a>
-                                        <br>
-                                        <small class="text-muted d-block mb-2">Your opponent is waiting</small>
-                                    </div>
-                                    
-                                    <!-- SUBMIT RESULT when code is shared -->
-                                    <div th:if="${bet.status.name() == 'CODE_SHARED'}">
-                                        <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
-                                           class="btn btn-primary btn-sm">
-                                            <i class="fas fa-flag"></i> Submit Result
-                                        </a>
-                                    </div>
-                                    
-                                    <!-- CANCEL OPTION -->
-                                    <form th:action="@{/bets/{betId}/cancel(betId=${bet.id})}" 
-                                          method="post" 
-                                          class="d-inline">
-                                        <input type="hidden" th:name="${_csrf.parameterName}" 
-                                               th:value="${_csrf.token}" />
-                                        <button type="submit" 
-                                                class="btn btn-outline-danger btn-sm"
-                                                onclick="return confirm('Cancel this bet? Your points will be refunded.')">
-                                            <i class="fas fa-times"></i> Cancel
-                                        </button>
-                                    </form>
+                            <div class="card-body">
+                                <div th:if="${inProgressBets?.empty}" class="text-center text-muted py-3">
+                                    <i class="fas fa-hourglass-half fa-2x mb-2"></i>
+                                    <p>No matches in progress</p>
                                 </div>
-                                
-                                <!-- ACTION BUTTONS FOR USER2 (ACCEPTOR) -->
-                                <div th:if="${bet.matchedBet != null and bet.matchedBet.creator.username == user.username}">
-                                    <div th:if="${bet.status.name() == 'ACCEPTED'}">
-                                        <div class="alert alert-info p-2 mb-2">
-                                            <small>
-                                                <i class="fas fa-hourglass-half"></i>
-                                                Waiting for code...
-                                            </small>
+                                <div th:each="bet : ${inProgressBets}" class="mb-3 p-3 border rounded">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="status-badge bg-info" th:text="${bet.status.name()}"></span>
+                                        <strong class="text-primary" th:text="'₱' + ${bet.points}"></strong>
+                                    </div>
+                                    <h6 th:text="${bet.title} ?: ${bet.gameType + ' Match'}"></h6>
+                                    <p class="mb-2">
+                                        <span th:if="${bet.creator.username == user.username}">
+                                            vs <strong th:text="${bet.acceptor.username}"></strong>
+                                        </span>
+                                        <span th:if="${bet.acceptor.username == user.username}">
+                                            vs <strong th:text="${bet.creator.username}"></strong>
+                                        </span>
+                                    </p>
+                                    <th:block th:if="${bet.status.name() == 'CODE_SHARED'}">
+                                        <div class="game-code mb-2" th:text="${bet.gameCode}"></div>
+                                        <p class="text-success small mb-2">
+                                            <i class="fas fa-check-circle me-1"></i>Game code shared
+                                        </p>
+                                    </th:block>
+                                    <th:block th:if="${bet.status.name() == 'ACCEPTED' && bet.creator.username == user.username}">
+                                        <div class="alert alert-warning p-2 mb-2">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            Share game code with your opponent
                                         </div>
-                                        <form th:action="@{/bets/{betId}/cancel(betId=${bet.id})}" 
-                                              method="post">
-                                            <input type="hidden" th:name="${_csrf.parameterName}" 
-                                                   th:value="${_csrf.token}" />
-                                            <button type="submit" 
-                                                    class="btn btn-outline-danger btn-sm"
-                                                    onclick="return confirm('Cancel this bet? Your points will be refunded.')">
-                                                <i class="fas fa-times"></i> Cancel Wait
+                                    </th:block>
+                                    <div class="d-flex gap-2">
+                                        <th:block th:if="${bet.status.name() == 'CODE_SHARED'}">
+                                            <button class="btn btn-primary btn-sm action-btn"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#submitResultModal"
+                                                    th:data-bet-id="${bet.id}">
+                                                Submit Result
                                             </button>
+                                        </th:block>
+                                        <th:block th:if="${bet.status.name() == 'ACCEPTED' && bet.creator.username == user.username}">
+                                            <button class="btn btn-warning btn-sm action-btn" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#shareCodeModal"
+                                                    th:data-bet-id="${bet.id}">
+                                                Share Code
+                                            </button>
+                                        </th:block>
+                                        <form th:action="@{/bets/{id}/cancel(id=${bet.id})}" method="post" class="d-inline">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm action-btn"
+                                                    onclick="return confirm('Cancel this match?')">
+                                                Cancel
+                                            </button>
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                                         </form>
                                     </div>
-                                    
-                                    <div th:if="${bet.status.name() == 'CODE_SHARED'}">
-                                        <a th:href="@{/bets/{betId}/submit-result(betId=${bet.id})}" 
-                                           class="btn btn-primary btn-sm">
-                                            <i class="fas fa-flag"></i> Submit Result
-                                        </a>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- History Tab -->
+            <div class="tab-pane fade" id="history" role="tabpanel">
+                <div class="card bet-card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Betting History</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Game</th>
+                                        <th>Points</th>
+                                        <th>Opponent</th>
+                                        <th>Result</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="bet : ${userBets}">
+                                        <td th:text="${#temporals.format(bet.createdAt, 'MMM dd, HH:mm')}"></td>
+                                        <td th:text="${bet.gameType}"></td>
+                                        <td th:text="'₱' + ${bet.points}"></td>
+                                        <td>
+                                            <span th:if="${bet.creator.username == user.username && bet.acceptor != null}" 
+                                                  th:text="${bet.acceptor.username}">Opponent</span>
+                                            <span th:if="${bet.acceptor != null && bet.acceptor.username == user.username}" 
+                                                  th:text="${bet.creator.username}">Opponent</span>
+                                            <span th:if="${bet.acceptor == null}" class="text-muted">Waiting...</span>
+                                        </td>
+                                        <td>
+                                            <th:block th:if="${bet.status.name() == 'COMPLETED'}">
+                                                <span th:if="${bet.determineWinner()?.username == user.username}" 
+                                                      class="badge bg-success">Won</span>
+                                                <span th:if="${bet.determineWinner()?.username != user.username && bet.determineWinner() != null}" 
+                                                      class="badge bg-danger">Lost</span>
+                                            </th:block>
+                                            <th:block th:if="${bet.status.name() == 'CANCELLED'}">
+                                                <span class="badge bg-secondary">Cancelled</span>
+                                            </th:block>
+                                            <th:block th:if="${bet.status.name() == 'DISPUTED'}">
+                                                <span class="badge bg-warning">Disputed</span>
+                                            </th:block>
+                                        </td>
+                                        <td>
+                                            <span th:classappend="${(bet.status.name() == 'COMPLETED') ? 'badge bg-success' : (bet.status.name() == 'CANCELLED') ? 'badge bg-secondary' : (bet.status.name() == 'DISPUTED') ? 'badge bg-warning' : 'badge bg-info'}"
+                                                  th:text="${bet.status.name()}">
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${userBets?.empty}">
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                                            <p>No betting history yet</p>
+                                            <p class="small">Start playing to see your history here!</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Share Code Modal -->
+<div class="modal fade" id="shareCodeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-key me-2"></i>Share Game Code</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="shareCodeForm" method="post">
+                <div class="modal-body">
+                    <p class="text-muted">Enter the game code that both players will use:</p>
+                    <input type="text" name="gameCode" class="form-control form-control-lg text-center" 
+                           placeholder="Enter game code" required maxlength="20">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Share Code</button>
+                </div>
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            </form>
         </div>
     </div>
 </div>
 
-                <!-- Real-Time Bet Feed -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5><i class="fas fa-bolt"></i> Live Betting Feed</h5>
-                                <small class="text-muted" id="liveBetsCount">0 active bets</small>
-                            </div>
-                            <div class="card-body p-0">
-                                <div id="liveBetsContainer">
-                                    <!-- Bets will appear here in real-time -->
-                                    <div class="text-center text-muted py-5" id="noBetsMessage">
-                                        <i class="fas fa-search fa-2x mb-2"></i>
-                                        <p>No active bets. Create the first one!</p>
-                                        <a th:href="@{/create-bet}" class="btn btn-primary btn-sm">
-                                            <i class="fas fa-plus-circle"></i> Create Bet
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+    <!-- Submit Result Modal -->
+    <div class="modal fade" id="submitResultModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-flag me-2"></i>Submit Game Result</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
+                <form id="submitResultForm" method="post" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Game Result</label>
+                            <select name="result" class="form-select" required>
+                                <option value="WIN">I Won 🏆</option>
+                                <option value="LOSE">I Lost</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Screenshot (Required if you won)</label>
+                            <input type="file" name="screenshot" class="form-control" accept="image/*">
+                            <div class="form-text">Upload proof of victory. Required when claiming win.</div>
+                        </div>
+                        <input type="hidden" name="id" id="submitResultBetId">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Submit Result</button>
+                    </div>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                </form>
+            </div>
+        </div>
+    </div>
 
-                <!-- Recent Activity -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Recent Activity</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle"></i> No recent activity. 
-                                    <a th:href="@{/create-bet}">Create your first bet!</a>
-                                </div>
-                            </div>
+    <!-- Profile Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="fas fa-user-circle me-2"></i>Your Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <div class="points-badge d-inline-block mb-3">
+                            <i class="fas fa-coins me-1"></i>
+                            <span th:text="${user?.availablePoints}">1000</span> Points
+                        </div>
+                        <h4 th:text="${user?.username}">Username</h4>
+                        <p class="text-muted" th:text="${user?.email}">email@example.com</p>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h5 th:text="${user?.wins ?: '0'}">0</h5>
+                            <small class="text-muted">Wins</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 th:text="${user?.losses ?: '0'}">0</h5>
+                            <small class="text-muted">Losses</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 th:text="${userActiveBets?.size() ?: '0'}">0</h5>
+                            <small class="text-muted">Active</small>
                         </div>
                     </div>
                 </div>
-            </main>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 
-    <!-- WebSocket Notifications -->
     <script th:inline="javascript">
         /*<![CDATA[*/
         const username = /*[[${user.username}]]*/ 'user';
         /*]]>*/
     </script>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
-
     <script>
-        // FIX: Enhanced scroll and layout management
+        // Modal handlers
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Dashboard loaded, fixing layout...');
-            
-            // Force immediate scroll to top
-            window.scrollTo(0, 0);
-            
-            // Prevent browser from remembering scroll position
-            if (history.scrollRestoration) {
-                history.scrollRestoration = 'manual';
-            }
-            
-            // Additional scroll fix after a short delay
-            setTimeout(() => {
-                window.scrollTo(0, 0);
-                document.body.style.overflow = 'auto';
-            }, 100);
-            
-            // Check URL parameters for scroll trigger
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('scroll') && urlParams.get('scroll') === 'top') {
-                window.scrollTo(0, 0);
-            }
-            
-            // Initialize WebSocket and other functionality
-            initializeDashboard();
-        });
-
-        // FIX: Handle page show event (for back/forward navigation)
-        window.addEventListener('pageshow', function(event) {
-            if (event.persisted) {
-                window.scrollTo(0, 0);
-            }
-        });
-
-        // FIX: Enhanced initialization function
-        function initializeDashboard() {
-            console.log('👤 Current user:', username);
-            
-            // Pre-load existing bets from server
-            const preloadedBets = /*[[${preloadedBets}]]*/ [];
-            console.log('📥 Pre-loaded bets count:', preloadedBets.length);
-            
-            if (preloadedBets && preloadedBets.length > 0) {
-                preloadedBets.forEach(bet => {
-                    if (bet.creatorUsername !== username) {
-                        console.log('➕ Pre-loading bet:', bet.id, 'by', bet.creatorUsername);
-                        addLiveBet(bet);
-                    }
+            // Share Code Modal - Dynamic form action
+            const shareCodeModal = document.getElementById('shareCodeModal');
+            if (shareCodeModal) {
+                shareCodeModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const betId = button.getAttribute('data-bet-id');
+                    
+                    // Set the form action dynamically
+                    const form = document.getElementById('shareCodeForm');
+                    form.action = `/bets/${betId}/set-game-code`;
                 });
             }
-            
-            // Initialize WebSocket connection
-            connect();
-            
-            // Update bets count
-            updateLiveBetsCount();
-        }
 
-        // Rest of your existing WebSocket and bet management functions...
+            // Submit Result Modal - Dynamic form action
+            const submitResultModal = document.getElementById('submitResultModal');
+            if (submitResultModal) {
+                submitResultModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const betId = button.getAttribute('data-bet-id');
+                    
+                    // Set the form action dynamically
+                    const form = document.getElementById('submitResultForm');
+                    form.action = `/bets/${betId}/submit-result`;
+                });
+            }
+
+            // Initialize WebSocket
+            initializeWebSocket();
+        });
+
+        // WebSocket functionality
         let stompClient = null;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
 
-        function connect() {
-            try {
-                const socket = new SockJS('/ws');
-                stompClient = Stomp.over(socket);
+        function initializeWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket connected');
                 
-                stompClient.connect({}, function(frame) {
-                    console.log('✅ WebSocket Connected for user:', username);
-                    reconnectAttempts = 0;
-                    
-                    // Subscribe to global bet updates
-                    stompClient.subscribe('/topic/bet-updates', function(message) {
-                        console.log('🎯 Global bet update received:', message.body);
-                        try {
-                            const update = JSON.parse(message.body);
-                            handleBetUpdate(update);
-                        } catch (e) {
-                            console.error('❌ Error parsing WebSocket message:', e);
-                        }
-                    });
-                    
-                }, function(error) {
-                    console.log('❌ WebSocket connection error: ', error);
-                    handleDisconnect();
+                stompClient.subscribe('/topic/bet-updates', function(message) {
+                    const update = JSON.parse(message.body);
+                    handleBetUpdate(update);
                 });
                 
-            } catch (error) {
-                console.log('❌ WebSocket initialization error: ', error);
-            }
-        }
-
-        function handleDisconnect() {
-            if (reconnectAttempts < maxReconnectAttempts) {
-                reconnectAttempts++;
-                setTimeout(function() {
-                    console.log('Attempting to reconnect... (' + reconnectAttempts + ')');
-                    connect();
-                }, 3000 * reconnectAttempts);
-            }
+            }, function(error) {
+                console.log('WebSocket error:', error);
+            });
         }
 
         function handleBetUpdate(update) {
             console.log('Received bet update:', update);
             if (update.type === 'NEW_BET') {
-                if (update.creatorUsername !== username) {
-                    console.log('➕ Adding new bet from:', update.creatorUsername);
-                    addLiveBet(update);
-                }
+                addLiveBet(update.bet);
             } else if (update.type === 'BET_ACCEPTED') {
-                console.log('Bet accepted, removing:', update.betId);
-                removeLiveBet(update.betId);
-            } else if (update.type === 'BET_MATCHED') {
-                console.log('Bet matched, removing:', update.betId);
-                removeLiveBet(update.betId);
+                removeLiveBet(update.bet.id);
+                // Use a small delay to ensure the backend has processed the update
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+            } else if (update.type === 'CODE_SHARED') {
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+            } else if (update.type === 'BET_COMPLETED') {
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+            } else if (update.type === 'BET_CANCELLED') {
+                removeLiveBet(update.bet.id);
             }
         }
 
         function addLiveBet(betData) {
+            if (betData.creator.username === username) return;
+            
             const container = document.getElementById('liveBetsContainer');
-            const noBetsMessage = document.getElementById('noBetsMessage');
+            const noBetsMessage = container.querySelector('.text-center');
             
-            if (!container) return;
-            
-            if (noBetsMessage) {
-                noBetsMessage.style.display = 'none';
-            }
-            
-            const existingBet = container.querySelector(`[data-bet-id="${betData.id}"]`);
-            if (existingBet) {
-                console.log('⏭️ Bet already exists, skipping:', betData.id);
-                return;
-            }
+            if (noBetsMessage) noBetsMessage.style.display = 'none';
             
             const betElement = document.createElement('div');
-            betElement.className = 'bet-feed-item border-bottom p-3';
+            betElement.className = 'p-3 border-bottom';
             betElement.setAttribute('data-bet-id', betData.id);
             
             const betTime = betData.createdAt ? new Date(betData.createdAt).toLocaleTimeString() : 'Just now';
@@ -612,75 +670,45 @@
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-2">
                             <span class="badge bg-primary me-2">NEW</span>
-                            <strong class="text-success"><i class="fas fa-coins"></i> ${betData.points} Points</strong>
+                            <strong class="text-success">₱${betData.points}</strong>
                         </div>
-                        <h6 class="mb-1">${betData.gameType} Challenge</h6>
+                        <h6>${betData.title || betData.gameType + ' Challenge'}</h6>
                         <p class="mb-1 text-muted small">
-                            <i class="fas fa-user"></i> Created by <strong>${betData.creatorUsername}</strong>
+                            <i class="fas fa-user me-1"></i>${betData.creator.username}
                         </p>
                         <p class="mb-0 text-muted small">
-                            <i class="fas fa-clock"></i> <span class="bet-time">${betTime}</span>
+                            <i class="fas fa-clock me-1"></i>${betTime}
                         </p>
                     </div>
                     <div class="text-end">
-                        <form action="/bets/${betData.id}/accept" method="post" 
-                            onsubmit="return confirm('Accept this ${betData.points} point ${betData.gameType} bet?')">
-                            <input type="hidden" name="_csrf" value="${getCsrfToken()}">
-                            <button type="submit" class="btn btn-success btn-sm">
-                                <i class="fas fa-check"></i> Accept Bet
+                        <form action="/bets/${betData.id}/accept" method="post">
+                            <button type="submit" class="btn btn-success btn-sm action-btn"
+                                    onclick="return confirm('Accept this bet?')">
+                                <i class="fas fa-check me-1"></i>Accept
                             </button>
+                            <input type="hidden" name="_csrf" value="${getCsrfToken()}">
                         </form>
-                        <small class="text-muted d-block mt-1">Click to challenge!</small>
                     </div>
                 </div>
             `;
             
-            const form = betElement.querySelector('form');
-            form.action = form.action.replace('__betId__', betData.id);
-            
-            const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
-            if (csrfToken) {
-                const csrfInput = form.querySelector('input[name="_csrf"]');
-                if (csrfInput) {
-                    csrfInput.value = csrfToken;
-                }
-            }
-            
-            betElement.style.opacity = '0';
-            betElement.style.transform = 'translateY(-10px)';
             container.insertBefore(betElement, container.firstChild);
-            
-            setTimeout(() => {
-                betElement.style.transition = 'all 0.3s ease';
-                betElement.style.opacity = '1';
-                betElement.style.transform = 'translateY(0)';
-            }, 100);
-            
             updateLiveBetsCount();
-        }
-
-        function getCsrfToken() {
-            const csrfInput = document.querySelector('input[name="_csrf"]');
-            return csrfInput ? csrfInput.value : '';
         }
 
         function removeLiveBet(betId) {
             const betElement = document.querySelector(`[data-bet-id="${betId}"]`);
             if (betElement) {
-                betElement.style.transition = 'all 0.3s ease';
-                betElement.style.opacity = '0';
-                betElement.style.transform = 'translateY(-10px)';
-                setTimeout(() => {
-                    betElement.remove();
-                    updateLiveBetsCount();
-                }, 300);
+                betElement.remove();
+                updateLiveBetsCount();
             }
         }
 
         function updateLiveBetsCount() {
-            const bets = document.querySelectorAll('#liveBetsContainer .bet-feed-item');
+            const container = document.getElementById('liveBetsContainer');
+            const bets = container.querySelectorAll('.border-bottom');
             const countElement = document.getElementById('liveBetsCount');
-            const noBetsMessage = document.getElementById('noBetsMessage');
+            const noBetsMessage = container.querySelector('.text-center');
             
             if (countElement) {
                 countElement.textContent = `${bets.length} active bet${bets.length !== 1 ? 's' : ''}`;
@@ -689,6 +717,10 @@
             if (noBetsMessage && bets.length === 0) {
                 noBetsMessage.style.display = 'block';
             }
+        }
+
+        function getCsrfToken() {
+            return document.querySelector('input[name="_csrf"]')?.value || '';
         }
     </script>
 </body>

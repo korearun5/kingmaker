@@ -1,9 +1,9 @@
 package com.kore.king.service;
 
-
-import com.kore.king.entity.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.kore.king.entity.User;
 
 @Service
 public class BetValidationService {
@@ -29,15 +29,9 @@ public class BetValidationService {
         }
 
         // Check user has enough points
-        if (user.getPoints() < points) {
-            throw new RuntimeException("Insufficient points. You have: " + user.getPoints());
+        if (!user.canAffordBet(points)) {
+            throw new RuntimeException("Insufficient points. Available: " + user.getAvailablePoints());
         }
-
-        // Check maximum active bets
-        // long activeBetsCount = betService.countUserActiveBets(user.getId());
-        // if (activeBetsCount >= maxActiveBets) {
-        //     throw new RuntimeException("Maximum " + maxActiveBets + " active bets allowed");
-        // }
 
         // Validate game type
         if (gameType == null || gameType.trim().isEmpty()) {
@@ -50,7 +44,7 @@ public class BetValidationService {
     }
 
     public void validateUserCanBet(User user) {
-        if (user.getPoints() < minPoints) {
+        if (user.getAvailablePoints() < minPoints) {
             throw new RuntimeException("You need at least " + minPoints + " points to create a bet");
         }
     }

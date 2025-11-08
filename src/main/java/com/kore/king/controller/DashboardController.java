@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -28,9 +29,6 @@ public class DashboardController {
     @Autowired
     private BetService betService;
 
-    @Autowired
-    private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
-        
     @GetMapping("/dashboard")
     public String dashboard(Authentication authentication, Model model) {
         try {
@@ -38,94 +36,54 @@ public class DashboardController {
             User user = userService.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // User's own pending bets (waiting for acceptance)
-            List<Bet> userPendingBets = betService.getActiveBetsForUser(user);
-
-            // User's active matches (accepted bets where user is either creator or acceptor)
-            List<Bet> userMatchedBets = betService.getUserActiveMatches(user.getId());
-
-            // Get ALL available bets (not just user's bets) for the live feed
-            List<Bet> availableBets = betService.findAvailableBets(BetStatus.PENDING, user.getId(), Pageable.unpaged())
-                .getContent()
-                .stream()
-                .filter(bet -> !bet.getCreator().getId().equals(user.getId())) // Exclude user's own bets
+            // Get user's active bets
+            List<Bet> userActiveBets = betService.getUserActiveBets(user.getId());
+            
+            // Get available bets (excluding user's own)
+            List<Bet> availableBets = betService.findAvailableBets(
+                BetStatus.PENDING, user.getId(), Pageable.unpaged()).getContent();
+            
+            // Get in-progress bets (ACCEPTED and CODE_SHARED)
+            List<Bet> inProgressBets = userActiveBets.stream()
+                .filter(bet -> bet.getStatus() == BetStatus.ACCEPTED || bet.getStatus() == BetStatus.CODE_SHARED)
                 .collect(Collectors.toList());
-
-            long activeBetsCount = betService.findUserActiveBetsCount(user.getId());
+            
+            // Get all user bets for history
+            Page<Bet> userBetsPage = betService.findUserBets(user.getId(), Pageable.unpaged());
 
             model.addAttribute("user", user);
-            model.addAttribute("activeBets", activeBetsCount);
-            model.addAttribute("preloadedBets", availableBets);
-            model.addAttribute("userPendingBets", userPendingBets);
-            model.addAttribute("userMatchedBets", userMatchedBets);
-            
+            model.addAttribute("userActiveBets", userActiveBets);
+            model.addAttribute("availableBets", availableBets);
+            model.addAttribute("inProgressBets", inProgressBets);
+            model.addAttribute("userBets", userBetsPage.getContent());
+
             return "dashboard";
         } catch (Exception e) {
-            System.err.println("Error in dashboard: " + e.getMessage());
-            e.printStackTrace();
             return "redirect:/login?error";
-        }
-    }
-
-    @GetMapping("/create-bet")
-    public String showCreateBetForm(Authentication authentication, Model model) {
-        try {
-            String username = authentication.getName();
-            User user = userService.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            
-            model.addAttribute("user", user);
-            model.addAttribute("bet", new Bet());
-            
-            return "create-bet";
-        } catch (Exception e) {
-            System.err.println("Error in create-bet form: " + e.getMessage());
-            return "redirect:/dashboard?error";
         }
     }
 
     @PostMapping("/create-bet")
     public String createBet(@RequestParam Integer points,
-                        @RequestParam String gameType,
-                        Authentication authentication,
-                        RedirectAttributes redirectAttributes) {
+                          @RequestParam String gameType,
+                          @RequestParam String title,
+                          @RequestParam(required = false) String description,
+                          Authentication authentication,
+                          RedirectAttributes redirectAttributes) {
         try {
             String username = authentication.getName();
             User user = userService.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            Bet bet = betService.createBet(user, points, gameType);
-            
-            // Broadcast new bet to ALL users via WebSocket
-            broadcastNewBet(bet);
+            betService.createBet(user, points, gameType, title, description);
             
             redirectAttributes.addFlashAttribute("success", 
-                "Bet created successfully! Waiting for opponent to accept.");
-            
-            return "redirect:/dashboard";
+                "Bet created successfully! Waiting for opponent.");
             
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
-            return "redirect:/create-bet";
         }
-    }
-
-    // Broadcast new bet to all connected users
-    private void broadcastNewBet(Bet bet) {
-        try {
-            java.util.Map<String, Object> message = new java.util.HashMap<>();
-            message.put("type", "NEW_BET");
-            message.put("id", bet.getId());
-            message.put("points", bet.getPoints());
-            message.put("gameType", bet.getGameType());
-            message.put("creatorUsername", bet.getCreator().getUsername());
-            message.put("createdAt", bet.getCreatedAt());
-            message.put("status", bet.getStatus().toString());
-            
-            messagingTemplate.convertAndSend("/topic/bet-updates", message);
-            System.out.println("📢 Broadcasted new bet: " + bet.getId() + " by " + bet.getCreator().getUsername());
-        } catch (Exception e) {
-            System.err.println("❌ Error broadcasting new bet: " + e.getMessage());
-        }
+        
+        return "redirect:/dashboard";
     }
 }

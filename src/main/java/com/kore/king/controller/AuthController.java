@@ -1,8 +1,7 @@
 package com.kore.king.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller; // Use UserService instead of CustomUserDetailsService
-import org.springframework.ui.Model;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model; // Use UserService instead of CustomUserDetailsService
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,8 +12,11 @@ import com.kore.king.service.UserService;
 @Controller
 public class AuthController {
 
-    @Autowired
-    private UserService userService; // Change to UserService
+    private final UserService userService;
+    
+    public AuthController(UserService userService) {
+        this.userService = userService;
+    }
 
     @GetMapping("/")
     public String home() {

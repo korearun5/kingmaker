@@ -1,11 +1,10 @@
 package com.kore.king.service;
 
-import java.util.Arrays;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -16,10 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.kore.king.entity.Bet;
 import com.kore.king.entity.BetStatus;
+import com.kore.king.entity.Result;
 import com.kore.king.entity.User;
 import com.kore.king.repository.BetRepository;
 
 @Service
+@Transactional
 public class BetService {
     
     @Autowired
@@ -34,71 +35,41 @@ public class BetService {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
-    public List<Bet> findAllOpenBets() {
-        return betRepository.findByStatus(BetStatus.PENDING);
-    }
-    
-    public Page<Bet> searchAvailableBets(BetStatus status, Long userId, String gameType, Integer points, Pageable pageable) {
-        if ((gameType != null && !gameType.isEmpty()) || points != null) {
-            return betRepository.searchAvailableBets(status, userId, gameType, points, pageable);
-        } else {
-            return betRepository.findAvailableBets(status, userId, pageable);
-        }
-    }
-    
+    // Basic CRUD operations
     public Page<Bet> findAvailableBets(BetStatus status, Long userId, Pageable pageable) {
         return betRepository.findAvailableBets(status, userId, pageable);
-    }
-    
-    public List<Bet> findAvailableBets(User currentUser) {
-        return betRepository.findByStatusAndCreatorNot(BetStatus.PENDING, currentUser);
     }
     
     public Page<Bet> findUserBets(Long userId, Pageable pageable) {
         return betRepository.findUserBets(userId, pageable);
     }
     
-    // UPDATED: Remove MATCHED from active statuses
-    public long findUserActiveBetsCount(Long userId) {
-        List<BetStatus> activeStatuses = Arrays.asList(
-            BetStatus.PENDING, 
-            BetStatus.ACCEPTED, 
-            BetStatus.CODE_SHARED
-        );
-        return betRepository.countUserActiveBets(userId, activeStatuses);
+    public List<Bet> getUserActiveBets(Long userId) {
+        return betRepository.findUserActiveBets(userId);
     }
     
-    @Transactional
-    public Bet createBet(Bet bet, String username) {
-        User user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        return createBet(user, bet.getPoints(), bet.getGameType());
+    public Optional<Bet> findById(Long betId) {
+        return betRepository.findByIdWithAcceptor(betId);
     }
-    
-    // MODIFIED: Remove userProvidedCode from creation - will be set after acceptance
+
+    // Bet creation
     @Transactional
-    public Bet createBet(User creator, Integer points, String gameType) {
-        // Check if user has enough points
-        if (creator.getPoints() < points) {
-            throw new RuntimeException("Insufficient points");
+    public Bet createBet(User creator, Integer points, String gameType, String title, String description) {
+        // Validate and hold points
+        if (!creator.canAffordBet(points)) {
+            throw new RuntimeException("Insufficient points. Available: " + creator.getAvailablePoints());
         }
         
-        // Reserve points by deducting them temporarily
-        creator.setPoints(creator.getPoints() - points);
+        creator.holdPoints(points);
         userService.saveUser(creator);
         
-        Bet bet = new Bet(creator, points, gameType);
-        bet.setCreatorResult("PENDING");
-        bet.setUserProvidedCode(""); // Will be set after acceptance
-        
+        // Create bet
+        Bet bet = new Bet(creator, points, gameType, title);
+        bet.setDescription(description);
         Bet savedBet = betRepository.save(bet);
         
         // Record transaction
         transactionService.recordBetCreation(savedBet);
-        
-        // Try to auto-match
-        tryAutoMatch(savedBet);
         
         // Broadcast new bet
         broadcastNewBet(savedBet);
@@ -106,92 +77,50 @@ public class BetService {
         return savedBet;
     }
 
+    // Bet acceptance
     @Transactional
     public Bet acceptBet(Long betId, User acceptor) {
-        System.out.println("=== ACCEPT BET START ===");
-        System.out.println("Bet ID: " + betId);
-        System.out.println("Acceptor: " + acceptor.getUsername());
-
-        Bet originalBet = betRepository.findById(betId)
-            .orElseThrow(() -> {
-                System.out.println("❌ Bet not found: " + betId);
-                return new RuntimeException("Bet not found");
-            });
-        System.out.println("Original Bet Status: " + originalBet.getStatus());
-        System.out.println("Original Bet Creator: " + originalBet.getCreator().getUsername());
+        Bet bet = betRepository.findById(betId)
+            .orElseThrow(() -> new RuntimeException("Bet not found"));
         
-        // Check if bet is still available
-        if (originalBet.getStatus() != BetStatus.PENDING) {
+        // Validations
+        if (bet.getStatus() != BetStatus.PENDING) {
             throw new RuntimeException("Bet is no longer available");
         }
         
-        // Check if the acceptor is not the creator
-        if (originalBet.getCreator().getId().equals(acceptor.getId())) {
+        if (bet.getCreator().getId().equals(acceptor.getId())) {
             throw new RuntimeException("You cannot accept your own bet");
         }
-
-        // Check if acceptor has enough points
-        if (acceptor.getPoints() < originalBet.getPoints()) {
+        
+        if (!acceptor.canAffordBet(bet.getPoints())) {
             throw new RuntimeException("Insufficient points to accept this bet");
         }
         
-        // Reserve points for acceptor
-        acceptor.setPoints(acceptor.getPoints() - originalBet.getPoints());
+        // Hold points for acceptor
+        acceptor.holdPoints(bet.getPoints());
         userService.saveUser(acceptor);
         
-        // Create acceptor's bet
-        Bet acceptorBet = new Bet(acceptor, originalBet.getPoints(), originalBet.getGameType());
-        acceptorBet.setStatus(BetStatus.ACCEPTED);
-        acceptorBet.setMatchedBet(originalBet);
-        acceptorBet.setCreatorResult("PENDING");
+        // Update bet
+        bet.setAcceptor(acceptor);
+        bet.setStatus(BetStatus.ACCEPTED);
+        Bet updatedBet = betRepository.save(bet);
         
-        // Update original bet status
-        originalBet.setStatus(BetStatus.ACCEPTED);
-        originalBet.setMatchedBet(acceptorBet);
+        // Record transaction
+        transactionService.recordBetAcceptance(updatedBet);
         
-        // Save both bets
-        betRepository.save(acceptorBet);
-        betRepository.save(originalBet);
+        // Broadcast acceptance
+        broadcastBetAccepted(updatedBet);
         
-        // Record transaction for acceptor
-        transactionService.recordBetCreation(acceptorBet);
-        
-        // Enhanced broadcasting
-        broadcastBetAccepted(originalBet, acceptor);
-
-        System.out.println("=== ACCEPT BET COMPLETE ===");
-        System.out.println("Acceptor Bet ID: " + acceptorBet.getId());
-        System.out.println("Original Bet Updated Status: " + originalBet.getStatus());
-
-        return acceptorBet;
+        return updatedBet;
     }
 
-    // NEW: Enhanced broadcast for bet acceptance
-    private void broadcastBetAccepted(Bet bet, User acceptor) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "BET_ACCEPTED");
-        message.put("betId", bet.getId());
-        message.put("acceptorUsername", acceptor.getUsername());
-        message.put("creatorUsername", bet.getCreator().getUsername());
-        message.put("points", bet.getPoints());
-        message.put("gameType", bet.getGameType());
-        message.put("timestamp", System.currentTimeMillis());
-        message.put("message", "Bet accepted! Creator should share game code soon.");
-        
-        // Broadcast to specific bet room
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
-        
-        // Notify creator
-        messagingTemplate.convertAndSend("/topic/user/" + bet.getCreator().getUsername(), message);
-        
-        // Global notification
-        messagingTemplate.convertAndSend("/topic/bet-updates", message);
-    }
-
+    // Game code sharing
+    @Transactional
     public Bet setGameCode(Long betId, String gameCode, String username) {
         Bet bet = betRepository.findById(betId)
             .orElseThrow(() -> new RuntimeException("Bet not found"));
         
+        // Validations
         if (!bet.getCreator().getUsername().equals(username)) {
             throw new RuntimeException("Only creator can set game code");
         }
@@ -204,200 +133,119 @@ public class BetService {
             throw new RuntimeException("Game code cannot be empty");
         }
         
-        // Set game code and update status
-        bet.setUserProvidedCode(gameCode.trim());
+        // Update bet
+        bet.setGameCode(gameCode.trim());
         bet.setStatus(BetStatus.CODE_SHARED);
+        bet.setCodeSharedAt(LocalDateTime.now());
         
-        // Also update the matched bet
-        if (bet.getMatchedBet() != null) {
-            bet.getMatchedBet().setUserProvidedCode(gameCode.trim());
-            bet.getMatchedBet().setStatus(BetStatus.CODE_SHARED);
-            betRepository.save(bet.getMatchedBet());
-        }
+        Bet updatedBet = betRepository.save(bet);
         
-        Bet savedBet = betRepository.save(bet);
+        // Broadcast code sharing
+        broadcastCodeShared(updatedBet);
         
-        // Enhanced broadcasting
-        broadcastCodeShared(savedBet, gameCode.trim());
-
-        return savedBet;
+        return updatedBet;
     }
 
-    // NEW: Enhanced broadcasting for code sharing
-    private void broadcastCodeShared(Bet bet, String gameCode) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "CODE_SHARED");
-        message.put("betId", bet.getId());
-        message.put("roomCode", gameCode);
-        message.put("creatorUsername", bet.getCreator().getUsername());
-        message.put("message", "Game code has been shared! You can now start playing.");
-        message.put("timestamp", System.currentTimeMillis());
-        
-        // Broadcast to both users
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
-        
-        // Notify acceptor specifically
-        if (bet.getMatchedBet() != null) {
-            String acceptorUsername = bet.getMatchedBet().getCreator().getUsername();
-            messagingTemplate.convertAndSend("/topic/user/" + acceptorUsername, message);
-        }
-        
-        // Global notification
-        messagingTemplate.convertAndSend("/topic/bet-updates", message);
-    }
-
+    // Result submission
     @Transactional
     public void submitResult(Long betId, String username, String result, String screenshot, boolean isCreator) {
         Bet bet = betRepository.findById(betId)
-                .orElseThrow(() -> new RuntimeException("Bet not found"));
+            .orElseThrow(() -> new RuntimeException("Bet not found"));
         
-        // Validate bet is in CODE_SHARED status
+        // Validations
         if (bet.getStatus() != BetStatus.CODE_SHARED) {
             throw new RuntimeException("Game code must be shared before submitting results");
         }
         
         // Check if user has already submitted
-        if (isCreator && bet.getCreatorSubmitted()) {
-            throw new RuntimeException("You have already submitted your result");
-        } else if (!isCreator && bet.getAcceptorSubmitted()) {
+        if ((isCreator && bet.getCreatorResult() != null) || 
+            (!isCreator && bet.getAcceptorResult() != null)) {
             throw new RuntimeException("You have already submitted your result");
         }
         
-        Bet opponentBet = bet.getMatchedBet();
-        
+        // Update result
+        Result resultEnum = Result.valueOf(result.toUpperCase());
         if (isCreator) {
-            bet.setCreatorResult(result);
-            bet.setCreatorSubmitted(true);
-            if ("WIN".equals(result) && screenshot != null) {
-                bet.setWinnerScreenshot(screenshot);
-            }
+            bet.setCreatorResult(resultEnum);
         } else {
-            bet.setAcceptorResult(result);
-            bet.setAcceptorSubmitted(true);
-            if ("WIN".equals(result) && screenshot != null) {
-                bet.setWinnerScreenshot(screenshot);
-            }
+            bet.setAcceptorResult(resultEnum);
         }
         
-        // Check if we can resolve the bet
-        if (bet.getCreatorSubmitted() && bet.getAcceptorSubmitted()) {
-            resolveBetAutomatically(bet, opponentBet);
+        // Handle screenshot for WIN claims
+        if (resultEnum == Result.WIN && screenshot != null) {
+            bet.setWinnerScreenshot(screenshot);
+        }
+        
+        // Check if both results are submitted
+        if (bet.bothResultsSubmitted()) {
+            resolveBet(bet);
+        } else {
+            bet.setStatus(BetStatus.RESULTS_SUBMITTED);
         }
         
         betRepository.save(bet);
-        betRepository.save(opponentBet);
         
         // Broadcast result submission
         broadcastResultUpdate(bet, username, result);
     }
 
-    private void tryAutoMatch(Bet newBet) {
-        List<Bet> pendingBets = betRepository.findByGameTypeAndStatus(
-            newBet.getGameType(), BetStatus.PENDING);
-        
-        Optional<Bet> matchingBet = pendingBets.stream()
-            .filter(bet -> bet.getPoints().equals(newBet.getPoints()))
-            .filter(bet -> !bet.getCreator().getId().equals(newBet.getCreator().getId()))
-            .findFirst();
-        
-        if (matchingBet.isPresent()) {
-            matchBets(newBet, matchingBet.get());
-        }
-    }
-    
+    // Bet resolution
     @Transactional
-    public void matchBets(Bet bet1, Bet bet2) {
-        // Reserve points for bet2 creator (since they're effectively accepting)
-        User bet2Creator = bet2.getCreator();
-        if (bet2Creator.getPoints() < bet2.getPoints()) {
-            return; // Can't auto-match if user doesn't have points
+    public void resolveBet(Bet bet) {
+        User winner = bet.determineWinner();
+        
+        if (winner != null) {
+            // Winner gets both stakes
+            winner.awardPoints(bet.getPoints() * 2);
+            
+            // Update user statistics
+            if (winner.getId().equals(bet.getCreator().getId())) {
+                bet.getCreator().setWins(bet.getCreator().getWins() + 1);
+                bet.getAcceptor().setLosses(bet.getAcceptor().getLosses() + 1);
+            } else {
+                bet.getAcceptor().setWins(bet.getAcceptor().getWins() + 1);
+                bet.getCreator().setLosses(bet.getCreator().getLosses() + 1);
+            }
+            
+            userService.saveUser(bet.getCreator());
+            userService.saveUser(bet.getAcceptor());
+            
+            // Record win transaction
+            transactionService.recordBetWin(bet, winner);
+            
+        } else {
+            // Dispute or invalid results - refund both
+            bet.getCreator().releasePoints(bet.getPoints());
+            bet.getAcceptor().releasePoints(bet.getPoints());
+            bet.setStatus(BetStatus.DISPUTED);
+            bet.setDisputeReason("Results conflict - both players claimed same result");
+            
+            userService.saveUser(bet.getCreator());
+            userService.saveUser(bet.getAcceptor());
+            
+            // Record refund transactions
+            transactionService.recordBetRefund(bet);
         }
         
-        bet2Creator.setPoints(bet2Creator.getPoints() - bet2.getPoints());
-        userService.saveUser(bet2Creator);
+        bet.setStatus(BetStatus.COMPLETED);
+        bet.setCompletedAt(LocalDateTime.now());
+        betRepository.save(bet);
         
-        // Update both bets to ACCEPTED
-        bet1.setStatus(BetStatus.ACCEPTED);
-        bet2.setStatus(BetStatus.ACCEPTED);
-        bet1.setMatchedBet(bet2);
-        bet2.setMatchedBet(bet1);
-        
-        betRepository.save(bet1);
-        betRepository.save(bet2);
-        
-        // Record transaction for bet2
-        transactionService.recordBetCreation(bet2);
-        
-        System.out.println("Bets auto-matched! Waiting for game code...");
-        
-        // Broadcast match creation
-        broadcastBetMatched(bet1);
+        // Broadcast completion
+        broadcastBetCompleted(bet);
     }
-    
-    private void broadcastBetMatched(Bet bet) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "BET_MATCHED");
-        message.put("betId", bet.getId());
-        message.put("points", bet.getPoints());
-        message.put("gameType", bet.getGameType());
-        
-        messagingTemplate.convertAndSend("/topic/bet-updates", message);
-    }
-    
-    @Transactional
-    public void resolveBet(Bet winningBet, String screenshotPath) {
-        Bet losingBet = winningBet.getMatchedBet();
-        
-        if (losingBet == null) {
-            throw new RuntimeException("No matched bet found");
-        }
-        
-        // Transfer points
-        User winner = winningBet.getCreator();
-        User loser = losingBet.getCreator();
-        
-        int points = winningBet.getPoints();
-        
-        // Winner gets the points (their own points back + opponent's points)
-        winner.setPoints(winner.getPoints() + (points * 2));
-        
-        // Update bet status
-        winningBet.setStatus(BetStatus.COMPLETED);
-        losingBet.setStatus(BetStatus.COMPLETED);
-        
-        userService.saveUser(winner);
-        userService.saveUser(loser);
-        betRepository.save(winningBet);
-        betRepository.save(losingBet);
-        
-        // Record win transaction
-        transactionService.recordBetWin(winningBet);
-        
-        System.out.println("Bet resolved! Winner: " + winner.getUsername());
-    }
-    
-    // ENHANCED: Cancel bet method that handles both creator and acceptor
+
+    // Bet cancellation
     @Transactional
     public void cancelBet(Long betId, String username) {
-        System.out.println("=== CANCEL BET START ===");
-        System.out.println("Bet ID: " + betId + ", Username: " + username);
-        
-        Bet bet = betRepository.findByIdWithMatchedBet(betId)
+        Bet bet = betRepository.findById(betId)
             .orElseThrow(() -> new RuntimeException("Bet not found"));
         
         User user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new RuntimeException("User not found"));
         
-        System.out.println("Bet Status: " + bet.getStatus());
-        System.out.println("Bet Creator: " + bet.getCreator().getUsername());
-        System.out.println("Matched Bet: " + (bet.getMatchedBet() != null ? bet.getMatchedBet().getCreator().getUsername() : "null"));
-        
-        // Validate user can cancel this bet
-        boolean isCreator = bet.getCreator().getId().equals(user.getId());
-        boolean isAcceptor = bet.getMatchedBet() != null && 
-                            bet.getMatchedBet().getCreator().getId().equals(user.getId());
-        
-        if (!isCreator && !isAcceptor) {
+        // Validate user can cancel
+        if (!bet.isUserParticipant(user)) {
             throw new RuntimeException("You are not involved in this bet");
         }
         
@@ -408,263 +256,34 @@ public class BetService {
         // Handle cancellation based on status
         if (bet.getStatus() == BetStatus.PENDING) {
             // Only creator can cancel pending bets
-            if (!isCreator) {
+            if (!bet.isCreator(user)) {
                 throw new RuntimeException("Only creator can cancel pending bets");
             }
-            cancelPendingBet(bet);
+            bet.getCreator().releasePoints(bet.getPoints());
+            userService.saveUser(bet.getCreator());
+            transactionService.recordBetRefund(bet);
+            
         } else if (bet.getStatus() == BetStatus.ACCEPTED) {
-            cancelAcceptedBet(bet, isCreator);
+            // Both players get refund
+            bet.getCreator().releasePoints(bet.getPoints());
+            bet.getAcceptor().releasePoints(bet.getPoints());
+            userService.saveUser(bet.getCreator());
+            userService.saveUser(bet.getAcceptor());
+            
+            transactionService.recordBetRefund(bet);
         }
+        
+        bet.setStatus(BetStatus.CANCELLED);
+        bet.setCancelReason("Cancelled by " + username);
+        betRepository.save(bet);
         
         // Broadcast cancellation
         broadcastBetCancelled(bet, username);
-        
-        System.out.println("=== CANCEL BET COMPLETE ===");
     }
 
-    // NEW: Cancel pending bet (creator only)
-    private void cancelPendingBet(Bet bet) {
-        User creator = bet.getCreator();
-        int pointsToReturn = bet.getPoints();
-        
-        // Return points to creator
-        creator.setPoints(creator.getPoints() + pointsToReturn);
-        userService.saveUser(creator);
-        
-        bet.setStatus(BetStatus.CANCELLED);
-        betRepository.save(bet);
-        
-        transactionService.recordBetRefund(bet);
-        
-        System.out.println("Pending bet cancelled. Points returned to creator: " + creator.getUsername());
-    }
-
-    // NEW: Cancel accepted bet (both parties can cancel)
-    private void cancelAcceptedBet(Bet bet, boolean isCreatorCancelling) {
-        User creator = bet.getCreator();
-        User acceptor = bet.getMatchedBet().getCreator();
-        int pointsToReturn = bet.getPoints();
-        
-        // Return points to both parties
-        creator.setPoints(creator.getPoints() + pointsToReturn);
-        acceptor.setPoints(acceptor.getPoints() + pointsToReturn);
-        
-        userService.saveUser(creator);
-        userService.saveUser(acceptor);
-        
-        // Update both bets
-        bet.setStatus(BetStatus.CANCELLED);
-        bet.getMatchedBet().setStatus(BetStatus.CANCELLED);
-        
-        // Set cancellation reason
-        String cancelReason = isCreatorCancelling ? 
-            "Cancelled by creator before code sharing" : 
-            "Cancelled by acceptor while waiting for code";
-        bet.setCancelReason(cancelReason);
-        bet.getMatchedBet().setCancelReason(cancelReason);
-        
-        betRepository.save(bet.getMatchedBet());
-        betRepository.save(bet);
-        
-        // Record transactions
-        transactionService.recordBetRefund(bet);
-        transactionService.recordBetRefund(bet.getMatchedBet());
-        
-        System.out.println("Accepted bet cancelled. Points returned to both players.");
-        System.out.println("Creator points: " + creator.getPoints() + ", Acceptor points: " + acceptor.getPoints());
-    }
-
-    // NEW: Enhanced broadcasting for cancellation
-    private void broadcastBetCancelled(Bet bet, String cancelledBy) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "BET_CANCELLED");
-        message.put("betId", bet.getId());
-        message.put("cancelledBy", cancelledBy);
-        message.put("points", bet.getPoints());
-        message.put("timestamp", System.currentTimeMillis());
-        
-        // Broadcast to both users
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
-        
-        // Notify the other party specifically
-        if (bet.getMatchedBet() != null) {
-            String otherUser = bet.getCreator().getUsername().equals(cancelledBy) ? 
-                bet.getMatchedBet().getCreator().getUsername() : 
-                bet.getCreator().getUsername();
-            messagingTemplate.convertAndSend("/topic/user/" + otherUser, message);
-        }
-        
-        // Global notification
-        messagingTemplate.convertAndSend("/topic/bet-updates", message);
-        
-        System.out.println("Broadcasted cancellation for bet: " + bet.getId());
-    }
-    
-    public Optional<Bet> findById(Long betId) {
-        return betRepository.findByIdWithMatchedBet(betId);
-    }
-    
-    public Bet saveBet(Bet bet) {
-        return betRepository.save(bet);
-    }
-    
-    public List<Bet> getActiveBetsForUser(User currentUser) {
-        return betRepository.findByStatus(BetStatus.PENDING)
-                .stream()
-                .sorted((b1, b2) -> b2.getCreatedAt().compareTo(b1.getCreatedAt()))
-                .collect(Collectors.toList());
-    }
-
-    // FIXED: Enhanced resolveBetAutomatically with better logging
-    private void resolveBetAutomatically(Bet bet1, Bet bet2) {
-        String creatorResult = bet1.getCreatorResult();
-        String acceptorResult = bet2.getAcceptorResult();
-        
-        System.out.println("=== RESOLVING BET ===");
-        System.out.println("Creator: " + bet1.getCreator().getUsername() + " - " + creatorResult);
-        System.out.println("Acceptor: " + bet2.getCreator().getUsername() + " - " + acceptorResult);
-        System.out.println("Points: " + bet1.getPoints());
-        
-        // Log current points before resolution
-        System.out.println("Before resolution - Creator points: " + bet1.getCreator().getPoints());
-        System.out.println("Before resolution - Acceptor points: " + bet2.getCreator().getPoints());
-        
-        if ("WIN".equals(creatorResult) && "LOSE".equals(acceptorResult)) {
-            // Creator wins
-            System.out.println("Resolution: Creator wins");
-            awardWinner(bet1.getCreator(), bet2.getCreator(), bet1.getPoints());
-            bet1.setWinnerUsername(bet1.getCreator().getUsername());
-            bet2.setWinnerUsername(bet1.getCreator().getUsername());
-            bet1.setLoserUsername(bet2.getCreator().getUsername());
-            bet2.setLoserUsername(bet2.getCreator().getUsername());
-        } else if ("LOSE".equals(creatorResult) && "WIN".equals(acceptorResult)) {
-            // Acceptor wins
-            System.out.println("Resolution: Acceptor wins");
-            awardWinner(bet2.getCreator(), bet1.getCreator(), bet1.getPoints());
-            bet1.setWinnerUsername(bet2.getCreator().getUsername());
-            bet2.setWinnerUsername(bet2.getCreator().getUsername());
-            bet1.setLoserUsername(bet1.getCreator().getUsername());
-            bet2.setLoserUsername(bet1.getCreator().getUsername());
-        } else if ("WIN".equals(creatorResult) && "WIN".equals(acceptorResult)) {
-            // Both claim win - dispute
-            System.out.println("Resolution: DISPUTE - both claimed WIN");
-            refundBothPlayers(bet1.getCreator(), bet2.getCreator(), bet1.getPoints());
-            bet1.setStatus(BetStatus.DISPUTED);
-            bet2.setStatus(BetStatus.DISPUTED);
-            bet1.setDisputeReason("Both players claimed victory");
-            bet2.setDisputeReason("Both players claimed victory");
-            return;
-        } else if ("LOSE".equals(creatorResult) && "LOSE".equals(acceptorResult)) {
-            // Both claim lose - refund both
-            System.out.println("Resolution: Both lost - refund");
-            refundBothPlayers(bet1.getCreator(), bet2.getCreator(), bet1.getPoints());
-            bet1.setStatus(BetStatus.CANCELLED);
-            bet2.setStatus(BetStatus.CANCELLED);
-            return;
-        } else {
-            // Invalid combination - dispute
-            System.out.println("Resolution: DISPUTE - invalid result combination");
-            refundBothPlayers(bet1.getCreator(), bet2.getCreator(), bet1.getPoints());
-            bet1.setStatus(BetStatus.DISPUTED);
-            bet2.setStatus(BetStatus.DISPUTED);
-            bet1.setDisputeReason("Invalid result combination: " + creatorResult + " vs " + acceptorResult);
-            bet2.setDisputeReason("Invalid result combination: " + creatorResult + " vs " + acceptorResult);
-            return;
-        }
-        
-        bet1.setStatus(BetStatus.COMPLETED);
-        bet2.setStatus(BetStatus.COMPLETED);
-        
-        // Log points after resolution
-        System.out.println("After resolution - Winner points: " + 
-            ("WIN".equals(creatorResult) ? bet1.getCreator().getPoints() : bet2.getCreator().getPoints()));
-        System.out.println("After resolution - Loser points: " + 
-            ("LOSE".equals(creatorResult) ? bet1.getCreator().getPoints() : bet2.getCreator().getPoints()));
-        
-        // Broadcast completion
-        broadcastBetCompleted(bet1);
-    }
-
-    // Enhanced awardWinner method with detailed logging
-    private void awardWinner(User winner, User loser, int points) {
-        System.out.println("=== AWARDING WINNER ===");
-        System.out.println("Winner before: " + winner.getUsername() + " - Points: " + winner.getPoints());
-        System.out.println("Loser before: " + loser.getUsername() + " - Points: " + loser.getPoints());
-        System.out.println("Points to award: " + (points * 2));
-        
-        // Winner gets both stakes (their points back + opponent's points)
-        int newWinnerPoints = winner.getPoints() + (points * 2);
-        winner.setPoints(newWinnerPoints);
-        userService.saveUser(winner);
-        transactionService.recordBetWin(winner, points * 2);
-        
-        System.out.println("Winner after: " + winner.getUsername() + " - Points: " + winner.getPoints());
-        System.out.println("=== AWARD COMPLETE ===");
-    }
-
-    // Enhanced refundBothPlayers method
-    private void refundBothPlayers(User creator, User acceptor, int points) {
-        System.out.println("=== REFUNDING BOTH PLAYERS ===");
-        System.out.println("Creator before: " + creator.getUsername() + " - Points: " + creator.getPoints());
-        System.out.println("Acceptor before: " + acceptor.getUsername() + " - Points: " + acceptor.getPoints());
-        
-        creator.setPoints(creator.getPoints() + points);
-        acceptor.setPoints(acceptor.getPoints() + points);
-        userService.saveUser(creator);
-        userService.saveUser(acceptor);
-        
-        System.out.println("Creator after: " + creator.getUsername() + " - Points: " + creator.getPoints());
-        System.out.println("Acceptor after: " + acceptor.getUsername() + " - Points: " + acceptor.getPoints());
-        System.out.println("=== REFUND COMPLETE ===");
-    }
-
-    private void broadcastNewBet(Bet bet) {
-        try {
-            Map<String, Object> message = new HashMap<>();
-            message.put("type", "NEW_BET");
-            message.put("id", bet.getId());
-            message.put("points", bet.getPoints());
-            message.put("gameType", bet.getGameType());
-            message.put("creatorUsername", bet.getCreator().getUsername());
-            message.put("createdAt", bet.getCreatedAt());
-            message.put("timestamp", System.currentTimeMillis());
-            
-            System.out.println("📢 Broadcasting new bet to /topic/bet-updates: " + message);
-            
-            messagingTemplate.convertAndSend("/topic/bet-updates", message);
-            
-        } catch (Exception e) {
-            System.err.println("❌ Error broadcasting bet: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    private void broadcastResultUpdate(Bet bet, String username, String result) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "RESULT_SUBMITTED");
-        message.put("betId", bet.getId());
-        message.put("username", username);
-        message.put("result", result);
-        message.put("isCreatorSubmitted", bet.getCreatorSubmitted());
-        message.put("isAcceptorSubmitted", bet.getAcceptorSubmitted());
-        message.put("userProvidedCode", bet.getUserProvidedCode());
-        
-        messagingTemplate.convertAndSend("/topic/bet-updates", message);
-    }
-
-    private void broadcastBetCompleted(Bet bet) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "BET_COMPLETED");
-        message.put("betId", bet.getId());
-        message.put("winner", bet.getWinnerUsername());
-        message.put("points", bet.getPoints());
-        message.put("userProvidedCode", bet.getUserProvidedCode());
-        
-        messagingTemplate.convertAndSend("/topic/bet-updates", message);
-    }
-
+    // Helper methods
     public boolean canUserSubmitResult(Long betId, String username, boolean isCreator) {
-        Optional<Bet> betOpt = betRepository.findByIdWithMatchedBet(betId);
+        Optional<Bet> betOpt = betRepository.findByIdWithAcceptor(betId);
         if (betOpt.isEmpty()) {
             return false;
         }
@@ -675,25 +294,15 @@ public class BetService {
             return false;
         }
         
-        // Primary check - use direct field access
-        boolean canSubmit;
         if (isCreator) {
-            canSubmit = !bet.getCreatorSubmitted();
+            return bet.getCreatorResult() == null;
         } else {
-            canSubmit = !bet.getAcceptorSubmitted();
+            return bet.getAcceptorResult() == null;
         }
-        
-        return canSubmit;
     }
-
-    // Update dashboard-related methods to use the new query
-    public List<Bet> getUserActiveMatches(Long userId) {
-        return betRepository.findUserActiveMatches(userId);
-    }
-
-    // NEW: Enhanced status validation methods
+    
     public boolean canUserShareCode(Long betId, String username) {
-        Optional<Bet> betOpt = betRepository.findByIdWithMatchedBet(betId);
+        Optional<Bet> betOpt = betRepository.findByIdWithAcceptor(betId);
         if (betOpt.isEmpty()) {
             return false;
         }
@@ -708,10 +317,9 @@ public class BetService {
         // Code can only be shared when bet is ACCEPTED
         return bet.getStatus() == BetStatus.ACCEPTED;
     }
-
-    // NEW: Check if user can cancel a bet
+    
     public boolean canUserCancelBet(Long betId, String username) {
-        Optional<Bet> betOpt = betRepository.findByIdWithMatchedBet(betId);
+        Optional<Bet> betOpt = betRepository.findByIdWithAcceptor(betId);
         if (betOpt.isEmpty()) {
             return false;
         }
@@ -720,12 +328,7 @@ public class BetService {
         User user = userService.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
-        // User can cancel if they are involved in the bet
-        boolean isCreator = bet.getCreator().getId().equals(user.getId());
-        boolean isAcceptor = bet.getMatchedBet() != null && 
-                            bet.getMatchedBet().getCreator().getId().equals(user.getId());
-        
-        if (!isCreator && !isAcceptor) {
+        if (!bet.isUserParticipant(user)) {
             return false;
         }
         
@@ -733,8 +336,89 @@ public class BetService {
         return bet.getStatus() == BetStatus.PENDING || bet.getStatus() == BetStatus.ACCEPTED;
     }
 
-    // NEW: Get waiting for code bets for a user
-    public List<Bet> getUserWaitingForCodeBets(Long userId) {
-        return betRepository.findByStatusAndMatchedBet_Creator_Id(BetStatus.ACCEPTED, userId);
+    // Updated Broadcasting methods with DTOs
+    private void broadcastNewBet(Bet bet) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "NEW_BET");
+        message.put("bet", createBetDTO(bet));
+        messagingTemplate.convertAndSend("/topic/bet-updates", message);
+    }
+    
+    private void broadcastBetAccepted(Bet bet) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "BET_ACCEPTED");
+        message.put("bet", createBetDTO(bet));
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+        if (bet.getAcceptor() != null) {
+            messagingTemplate.convertAndSend("/topic/user/" + bet.getAcceptor().getUsername(), message);
+        }
+    }
+    
+    private void broadcastCodeShared(Bet bet) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "CODE_SHARED");
+        message.put("bet", createBetDTO(bet));
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+    }
+    
+    private void broadcastResultUpdate(Bet bet, String username, String result) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "RESULT_SUBMITTED");
+        message.put("betId", bet.getId());
+        message.put("username", username);
+        message.put("result", result);
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+    }
+    
+    private void broadcastBetCompleted(Bet bet) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "BET_COMPLETED");
+        message.put("bet", createBetDTO(bet));
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+    }
+    
+    private void broadcastBetCancelled(Bet bet, String cancelledBy) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "BET_CANCELLED");
+        message.put("bet", createBetDTO(bet));
+        message.put("cancelledBy", cancelledBy);
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+    }
+
+    // Helper method to create a simplified DTO for Bet (prevents circular references)
+    private Map<String, Object> createBetDTO(Bet bet) {
+        Map<String, Object> dto = new HashMap<>();
+        dto.put("id", bet.getId());
+        dto.put("title", bet.getTitle());
+        dto.put("description", bet.getDescription());
+        dto.put("points", bet.getPoints());
+        dto.put("status", bet.getStatus());
+        dto.put("gameCode", bet.getGameCode());
+        dto.put("gameType", bet.getGameType());
+        dto.put("createdAt", bet.getCreatedAt());
+        dto.put("codeSharedAt", bet.getCodeSharedAt());
+        dto.put("completedAt", bet.getCompletedAt());
+        dto.put("creatorResult", bet.getCreatorResult());
+        dto.put("acceptorResult", bet.getAcceptorResult());
+        
+        // Add creator info without circular references
+        if (bet.getCreator() != null) {
+            Map<String, Object> creatorInfo = new HashMap<>();
+            creatorInfo.put("id", bet.getCreator().getId());
+            creatorInfo.put("username", bet.getCreator().getUsername());
+            creatorInfo.put("availablePoints", bet.getCreator().getAvailablePoints());
+            dto.put("creator", creatorInfo);
+        }
+        
+        // Add acceptor info without circular references
+        if (bet.getAcceptor() != null) {
+            Map<String, Object> acceptorInfo = new HashMap<>();
+            acceptorInfo.put("id", bet.getAcceptor().getId());
+            acceptorInfo.put("username", bet.getAcceptor().getUsername());
+            acceptorInfo.put("availablePoints", bet.getAcceptor().getAvailablePoints());
+            dto.put("acceptor", acceptorInfo);
+        }
+        
+        return dto;
     }
 }

@@ -1,5 +1,7 @@
 package com.kore.king.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.ui.Model;
@@ -15,9 +17,11 @@ public class GlobalControllerAdvice {
     @Autowired
     private UserService userService;
 
+    private static final Logger logger = LoggerFactory.getLogger(GlobalControllerAdvice.class);
+    
     @ModelAttribute
     public void addUserToModel(Authentication authentication, Model model) {
-        if (authentication != null && authentication.isAuthenticated() && !authentication.getName().equals("anonymousUser")) {
+        if (isAuthenticatedUser(authentication)) {
             try {
                 String username = authentication.getName();
                 User user = userService.findByUsername(username).orElse(null);
@@ -26,8 +30,14 @@ public class GlobalControllerAdvice {
                 }
             } catch (Exception e) {
                 // Log the error but don't break the application
-                System.err.println("Error loading user for global model: " + e.getMessage());
+                 logger.warn("Error loading user for global model: {}", e.getMessage());
             }
         }
+    }
+    private boolean isAuthenticatedUser(Authentication authentication) {
+    return authentication != null && 
+            authentication.isAuthenticated() && 
+            !(authentication.getPrincipal() instanceof String && 
+                "anonymousUser".equals(authentication.getPrincipal()));
     }
 }

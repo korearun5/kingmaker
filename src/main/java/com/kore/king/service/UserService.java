@@ -42,12 +42,4 @@ public class UserService {
     public Optional<User> findById(Long id) {
         return userRepository.findById(id);
     }
-    
-    public void updateUserPoints(Long userId, Integer pointsChange) {
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        user.setPoints(user.getPoints() + pointsChange);
-        userRepository.save(user);
-    }
 }

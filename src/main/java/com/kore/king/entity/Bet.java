@@ -13,13 +13,20 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "bets")
+@Table(name = "bets", indexes = {
+    @Index(name = "idx_bet_status", columnList = "status"),
+    @Index(name = "idx_bet_creator", columnList = "creator_id"),
+    @Index(name = "idx_bet_acceptor", columnList = "acceptor_id"),
+    @Index(name = "idx_bet_created", columnList = "createdAt"),
+    @Index(name = "idx_bet_status_created", columnList = "status, createdAt")
+})
 public class Bet {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

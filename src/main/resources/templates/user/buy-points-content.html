@@ -1,0 +1,143 @@
+<div th:fragment="content">
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Buy Points</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Current Points:</strong> 
+                                    <span th:text="${user.availablePoints}" class="fw-bold"></span> points
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Request Form -->
+                        <form th:action="@{/user/buy-points/request}" method="post" enctype="multipart/form-data">
+                            <div class="row">
+                                <div class="col-12 col-md-6">
+                                    <div class="mb-3">
+                                        <label for="amount" class="form-label">Amount (₹)</label>
+                                        <input type="number" class="form-control" id="amount" name="amount" 
+                                               min="100" max="10000" required>
+                                        <div class="form-text">Minimum: ₹100, Maximum: ₹10,000</div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <div class="mb-3">
+                                        <label for="paymentMethod" class="form-label">Payment Method</label>
+                                        <select class="form-control" id="paymentMethod" name="paymentMethod" required>
+                                            <option value="">Select Payment Method</option>
+                                            <option th:each="method : ${paymentMethods}" 
+                                                    th:value="${method}" 
+                                                    th:text="${method.displayName}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- UPI Details -->
+                            <div id="upiDetails" class="payment-details" style="display: none;">
+                                <div class="mb-3">
+                                    <label for="upiId" class="form-label">UPI ID</label>
+                                    <input type="text" class="form-control" id="upiId" name="upiId" 
+                                           placeholder="yourname@upi">
+                                </div>
+                            </div>
+
+                            <!-- Bank Details -->
+                            <div id="bankDetails" class="payment-details" style="display: none;">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="mb-3">
+                                            <label for="accountHolderName" class="form-label">Account Holder Name</label>
+                                            <input type="text" class="form-control" id="accountHolderName" 
+                                                   name="accountHolderName" placeholder="Full Name as in Bank">
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <div class="mb-3">
+                                            <label for="accountNumber" class="form-label">Account Number</label>
+                                            <input type="text" class="form-control" id="accountNumber" 
+                                                   name="accountNumber" placeholder="Bank Account Number">
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <div class="mb-3">
+                                            <label for="ifscCode" class="form-label">IFSC Code</label>
+                                            <input type="text" class="form-control" id="ifscCode" 
+                                                   name="ifscCode" placeholder="Bank IFSC Code">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Screenshot Upload -->
+                            <div class="mb-3">
+                                <label for="screenshot" class="form-label">Payment Screenshot</label>
+                                <input type="file" class="form-control" id="screenshot" name="screenshot" 
+                                       accept="image/*" required>
+                                <div class="form-text">Upload screenshot of successful payment (JPG, PNG, max 5MB)</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-success btn-lg w-100">
+                                <i class="fas fa-paper-plane me-2"></i>Submit Payment Request
+                            </button>
+                        </form>
+
+                        <!-- Payment History -->
+                        <div class="mt-5">
+                            <h5><i class="fas fa-history me-2"></i>Payment History</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Method</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="payment : ${paymentHistory}">
+                                            <td th:text="${#temporals.format(payment.createdAt, 'dd/MM/yyyy HH:mm')}"></td>
+                                            <td>₹<span th:text="${payment.amount}"></span></td>
+                                            <td th:text="${payment.paymentMethod.displayName}"></td>
+                                            <td>
+                                                <span th:if="${payment.status == 'PENDING'}" class="badge bg-warning">Pending</span>
+                                                <span th:if="${payment.status == 'APPROVED'}" class="badge bg-success">Approved</span>
+                                                <span th:if="${payment.status == 'REJECTED'}" class="badge bg-danger">Rejected</span>
+                                            </td>
+                                        </tr>
+                                        <tr th:if="${#lists.isEmpty(paymentHistory)}">
+                                            <td colspan="4" class="text-center text-muted">No payment history found</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Show/hide payment details based on method
+        document.getElementById('paymentMethod').addEventListener('change', function() {
+            const method = this.value;
+            document.querySelectorAll('.payment-details').forEach(el => el.style.display = 'none');
+            
+            if (method === 'MANUAL_UPI') {
+                document.getElementById('upiDetails').style.display = 'block';
+            } else if (method === 'MANUAL_BANK') {
+                document.getElementById('bankDetails').style.display = 'block';
+            }
+        });
+    </script>
+</div>

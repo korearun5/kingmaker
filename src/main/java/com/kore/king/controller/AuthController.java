@@ -18,10 +18,10 @@ public class AuthController {
         this.userService = userService;
     }
 
-    @GetMapping("/")
-    public String home() {
-        return "redirect:/dashboard";
-    }
+    //@GetMapping("/")
+    //public String home() {
+    //    return "redirect:/dashboard";
+    //}
 
     @GetMapping("/register")
     public String showRegistrationForm(Model model) {

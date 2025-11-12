@@ -1,0 +1,7 @@
+spring:
+  cache:
+    type: simple
+  redis:
+    host: localhost
+    port: 6379
+    # Don't connect to Redis in tests

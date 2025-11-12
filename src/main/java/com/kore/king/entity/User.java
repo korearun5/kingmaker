@@ -14,23 +14,38 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+    @Index(name = "idx_user_username", columnList = "username"),
+    @Index(name = "idx_user_email", columnList = "email"),
+    @Index(name = "idx_user_role", columnList = "role"),
+    @Index(name = "idx_user_created", columnList = "createdAt")
+})
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    
+    @Version
+    private Long version; // ADD OPTIMISTIC LOCKING
+    
     @Column(unique = true, nullable = false)
+    @Size(min = 3, max = 50)
     private String username;
 
     @Column(nullable = false)
+    @JsonIgnore
     private String password;
 
     @Column(unique = true, nullable = false)
+    @Email
     private String email;
 
     private int availablePoints = 1000;
@@ -53,36 +68,36 @@ public class User {
     private int losses = 0;
     private int disputes = 0;
 
-    public User() {}
-    
+    public User() {
+        // Default constructor
+    }
     public User(String username, String email, String password) {
         this.username = username;
         this.email = email;
         this.password = password;
     }
-
-    // Helper methods
-    public boolean canAffordBet(int points) {
+    // FIXED: Thread-safe point operations
+    public synchronized boolean canAffordBet(int points) {
         return availablePoints >= points;
     }
     
-    public void holdPoints(int points) {
-        if (canAffordBet(points)) {
-            this.availablePoints -= points;
-            this.heldPoints += points;
-        } else {
-            throw new RuntimeException("Insufficient points");
+    public synchronized void holdPoints(int points) {
+        if (!canAffordBet(points)) {
+            throw new RuntimeException("Insufficient points. Available: " + availablePoints + ", Required: " + points);
         }
+        this.availablePoints -= points;
+        this.heldPoints += points;
     }
     
-    public void releasePoints(int points) {
-        if (this.heldPoints >= points) {
-            this.heldPoints -= points;
-            this.availablePoints += points;
+    public synchronized void releasePoints(int points) {
+        if (this.heldPoints < points) {
+            throw new RuntimeException("Cannot release more points than held. Held: " + heldPoints + ", Requested: " + points);
         }
+        this.heldPoints -= points;
+        this.availablePoints += points;
     }
     
-    public void awardPoints(int points) {
+    public synchronized void awardPoints(int points) {
         this.availablePoints += points;
     }
 

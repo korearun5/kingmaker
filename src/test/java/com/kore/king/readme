@@ -1,0 +1,31 @@
+# Run all tests with coverage
+mvn clean test jacoco:report
+
+# Run only unit tests
+mvn test
+
+# Run integration tests
+mvn failsafe:integration-test
+
+# Run with specific profile
+mvn test -Pcoverage
+
+# Generate detailed reports
+mvn site
+
+# Check code quality
+mvn checkstyle:check spotbugs:check pmd:check
+
+
+
+Sample Test Report Structure
+
+target/
+├── site/
+│   ├── jacoco/          # Code coverage reports
+│   ├── checkstyle/      # Code quality reports  
+│   ├── spotbugs/        # Bug detection reports
+│   └── pmd/            # Code analysis reports
+├── surefire-reports/    # Unit test reports
+├── failsafe-reports/    # Integration test reports
+└── jacoco.exec         # Coverage execution data

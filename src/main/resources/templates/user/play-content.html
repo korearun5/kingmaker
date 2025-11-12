@@ -1,0 +1,33 @@
+<div th:fragment="content">
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-gamepad me-2"></i>Play Game</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center py-4">
+                            <i class="fas fa-dice fa-3x text-primary mb-3"></i>
+                            <h5>Create or Join a Bet</h5>
+                            <p class="text-muted">Start a new game or join existing matches</p>
+                            
+                            <div class="row mt-4">
+                                <div class="col-12 col-md-6 mb-3">
+                                    <a href="/bets/create" class="btn btn-primary btn-lg w-100">
+                                        <i class="fas fa-plus-circle me-2"></i>Create Bet
+                                    </a>
+                                </div>
+                                <div class="col-12 col-md-6 mb-3">
+                                    <a href="/bets/available" class="btn btn-success btn-lg w-100">
+                                        <i class="fas fa-list me-2"></i>Available Bets
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

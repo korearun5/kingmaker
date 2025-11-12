@@ -1,0 +1,116 @@
+# src/main/resources/application-prod.yml
+spring:
+  profiles: prod
+  
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/betking
+    username: ${DB_USERNAME:betking_user}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      idle-timeout: 600000
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+        generate_statistics: false
+        connection_provider_disables_autocommit: true
+  
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000
+  
+  thymeleaf:
+    cache: true
+    mode: HTML
+  
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+  forward-headers-strategy: framework
+
+logging:
+  level:
+    com.kore.king: INFO
+    org.springframework.security: WARN
+    org.hibernate: WARN
+  file:
+    name: logs/betking.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: when_authorized
+    metrics:
+      enabled: true
+
+app:
+  admin:
+    default-username: ${ADMIN_USERNAME:admin}
+    default-password: ${ADMIN_PASSWORD:}
+    default-email: ${ADMIN_EMAIL:admin@betking.com}
+  
+  withdrawal:
+    min-amount: 100
+    max-amount: 10000
+    daily-limit: 3
+    auto-approve-limit: 1000
+  
+  commission:
+    platform:
+      with-referral: 0.03
+      without-referral: 0.04
+    referral: 0.01
+  
+  betting:
+    min-points: 10
+    max-points: 10000
+    max-active-bets: 5
+
+# Custom properties for production
+betking:
+  security:
+    require-ssl: true
+    session-timeout: 3600
+  upload:
+    max-file-size: 5242880
+    allowed-types: image/jpeg,image/png,image/jpg,application/pdf

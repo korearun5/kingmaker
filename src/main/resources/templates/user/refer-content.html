@@ -1,0 +1,70 @@
+<div th:fragment="content">
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0"><i class="fas fa-share-alt me-2"></i>Refer & Earn</h4>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="py-4">
+                            <i class="fas fa-gift fa-3x text-success mb-3"></i>
+                            <h4>Earn 10% Commission on Friends' Wins!</h4>
+                            <p class="text-muted">Share your referral code and earn rewards</p>
+                            
+                            <div class="card bg-light mt-4">
+                                <div class="card-body">
+                                    <h5>Your Referral Code</h5>
+                                    <div class="input-group mb-3">
+                                        <input type="text" class="form-control text-center font-monospace" 
+                                               th:value="${user?.username}" readonly>
+                                        <button class="btn btn-outline-primary" type="button" onclick="copyReferralCode()">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Share this code with your friends</small>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-12 col-md-4 mb-3">
+                                    <div class="card stat-card text-white" style="background: linear-gradient(45deg, #3498db, #2980b9);">
+                                        <div class="card-body">
+                                            <h6>Total Referrals</h6>
+                                            <h3>0</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-4 mb-3">
+                                    <div class="card stat-card text-white" style="background: linear-gradient(45deg, #27ae60, #229954);">
+                                        <div class="card-body">
+                                            <h6>Total Earnings</h6>
+                                            <h3>0</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-4 mb-3">
+                                    <div class="card stat-card text-white" style="background: linear-gradient(45deg, #e74c3c, #c0392b);">
+                                        <div class="card-body">
+                                            <h6>Active Referrals</h6>
+                                            <h3>0</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyReferralCode() {
+            const codeInput = document.querySelector('input[th\\:value]');
+            codeInput.select();
+            document.execCommand('copy');
+            alert('Referral code copied to clipboard!');
+        }
+    </script>
+</div>

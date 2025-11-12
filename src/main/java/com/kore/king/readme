@@ -1,0 +1,166 @@
+Redis test execution commands,
+# Run tests without Redis (using in-memory cache)
+mvn clean test
+
+# Run with Redis (if you have Redis running)
+REDIS_HOST=localhost mvn test
+
+# Run specific test class
+mvn test -Dtest=BetServiceTest
+
+# Run with coverage
+mvn clean test jacoco:report
+
+
+
+
+UAT plan ---------------
+
+
+Pre-Test Setup
+- [ ] Test environment configured (UAT server)
+- [ ] Test database with sample data
+- [ ] Test user accounts created (regular, admin, employee_admin)
+- [ ] Payment gateway test mode enabled
+- [ ] Email testing configured
+- [ ] Monitoring tools active
+- [ ] Backup/restore procedure tested
+
+
+
+
+
+Test Execution Tracking
+## Daily Test Execution Log
+
+Date: ______________
+Tester: ______________
+
+### Tests Executed:
+- [ ] AUTH-001 to AUTH-012
+- [ ] BET-001 to BET-020
+- [ ] PAY-001 to PAY-005
+- [ ] WD-001 to WD-005
+- [ ] ADM-PAY-001 to ADM-PAY-004
+
+### Critical Issues Found:
+1. 
+2. 
+3. 
+
+### Test Environment Status:
+- Application: □ Stable □ Unstable
+- Database: □ Normal □ Issues
+- Performance: □ Acceptable □ Slow
+
+### Next Steps:
+- 
+
+
+
+Launch Readiness Criteria
+## GO/NO-GO CHECKLIST
+
+### Critical (Must Pass)
+- [ ] All authentication tests pass
+- [ ] Bet creation and acceptance work correctly
+- [ ] Payment and withdrawal flows functional
+- [ ] No security vulnerabilities found
+- [ ] Data integrity maintained in all scenarios
+- [ ] System handles expected load
+
+### High Priority
+- [ ] Admin functionalities operational
+- [ ] Real-time notifications working
+- [ ] Mobile responsiveness verified
+- [ ] Error handling graceful
+- [ ] All templates render correctly
+
+### Medium Priority
+- [ ] Performance meets requirements
+- [ ] Usability feedback addressed
+- [ ] Documentation complete
+- [ ] Monitoring configured
+- [ ] Backup procedures tested
+
+## LAUNCH DECISION:
+□ GO - All critical and high priority criteria met
+□ NO-GO - Critical issues remain unresolved
+
+
+
+
+Sample Test Users
+# Regular Users
+Username: testuser1, Password: test123, Points: 5000
+Username: testuser2, Password: test123, Points: 3000
+Username: testuser3, Password: test123, Points: 7000
+
+# Admin Users  
+Username: admin, Password: admin123, Role: MAIN_ADMIN
+Username: employee, Password: employee123, Role: EMPLOYEE_ADMIN
+
+
+
+
+Test Payment Methods
+# Test UPI ID: test@upi
+# Test Bank Details:
+# Account: 1234567890
+# IFSC: TEST0123456
+# Holder: Test User
+
+
+This comprehensive UAT plan ensures
+
+
+
+
+# BetKing Production Deployment Checklist
+
+## Pre-Deployment
+- [ ] Environment variables configured
+- [ ] SSL certificates obtained
+- [ ] Database backup taken
+- [ ] Domain DNS configured
+- [ ] CDN configured (if using)
+
+## Security
+- [ ] Admin password changed from default
+- [ ] SSL/TLS configured
+- [ ] CSRF protection enabled
+- [ ] CORS configured
+- [ ] Security headers set
+- [ ] Rate limiting configured
+
+## Database
+- [ ] Production database running
+- [ ] Database user with limited privileges
+- [ ] Connection pooling configured
+- [ ] Backup strategy in place
+
+## Application
+- [ ] JAR built with production profile
+- [ ] Logging configured
+- [ ] Monitoring enabled
+- [ ] Health checks passing
+- [ ] Cache configured
+
+## Infrastructure
+- [ ] Reverse proxy configured (Nginx)
+- [ ] Load balancer configured (if needed)
+- [ ] Firewall rules set
+- [ ] SSL termination configured
+
+## Testing
+- [ ] Smoke tests passing
+- [ ] Load testing completed
+- [ ] Security scan completed
+- [ ] Backup restoration tested
+
+## Post-Deployment
+- [ ] Admin user created
+- [ ] Payment gateway configured
+- [ ] Email service configured
+- [ ] Monitoring alerts set up
+- [ ] Documentation updated

@@ -1,5 +1,6 @@
 package com.kore.king.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,4 +54,13 @@ public interface BetRepository extends JpaRepository<Bet, Long> {
            "com.kore.king.entity.BetStatus.ACCEPTED, " +
            "com.kore.king.entity.BetStatus.CODE_SHARED)")
     boolean hasActiveBets(@Param("userId") Long userId);
+
+    long countByStatus(BetStatus status);
+    
+    long countByStatusIn(List<BetStatus> statuses);
+    
+    long countByCreatedAtAfter(LocalDateTime dateTime);
+    
+    @Query("SELECT SUM(b.points) FROM Bet b WHERE b.status = 'COMPLETED'")
+    Optional<Integer> sumCompletedBetPoints();
 }

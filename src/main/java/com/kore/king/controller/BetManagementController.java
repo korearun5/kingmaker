@@ -32,14 +32,14 @@ public class BetManagementController {
             User acceptor = userService.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("User not found"));
             
-            betService.acceptBet(id, acceptor);
+            betService.acceptBet(id, acceptor.getId());
             redirectAttributes.addFlashAttribute("success", "Bet accepted successfully!");
             
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         
-        return "redirect:/dashboard";
+        return "redirect:/user/dashboard-content";
     }
 
     @PostMapping("/{id}/set-game-code")
@@ -54,7 +54,7 @@ public class BetManagementController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         
-        return "redirect:/dashboard";
+        return "redirect:/user/dashboard-content";
     }
 
     @PostMapping("/{id}/submit-result")
@@ -78,7 +78,7 @@ public class BetManagementController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         
-        return "redirect:/dashboard";
+        return "redirect:/user/dashboard-content";
     }
 
     @PostMapping("/{id}/cancel")
@@ -92,7 +92,7 @@ public class BetManagementController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         
-        return "redirect:/dashboard";
+        return "redirect:/user/dashboard-content";
     }
 
     private String storeScreenshot(MultipartFile screenshot) {

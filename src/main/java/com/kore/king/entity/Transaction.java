@@ -9,12 +9,19 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "transactions", indexes = {
+    @Index(name = "idx_transaction_from_user", columnList = "fromUser_id"),
+    @Index(name = "idx_transaction_to_user", columnList = "toUser_id"),
+    @Index(name = "idx_transaction_bet", columnList = "bet_id"),
+    @Index(name = "idx_transaction_created", columnList = "createdAt"),
+    @Index(name = "idx_transaction_type", columnList = "type")
+})
 public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

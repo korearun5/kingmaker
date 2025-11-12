@@ -6,35 +6,53 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kore.king.config.AppConfig;
 import com.kore.king.entity.Bet;
 import com.kore.king.entity.BetStatus;
 import com.kore.king.entity.Result;
+import com.kore.king.entity.Transaction;
+import com.kore.king.entity.TransactionType;
 import com.kore.king.entity.User;
 import com.kore.king.repository.BetRepository;
+import com.kore.king.repository.TransactionRepository;
+
+import jakarta.persistence.EntityManager;
 
 @Service
 @Transactional
 public class BetService {
     
-    @Autowired
-    private BetRepository betRepository;
+    private final BetRepository betRepository;
+    private final UserService userService;
+    private final TransactionService transactionService;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final ReferralService referralService;
+    private final AppConfig appConfig;
+    private final TransactionRepository transactionRepository;
+    private final EntityManager entityManager;
     
-    @Autowired
-    private UserService userService;
-    
-    @Autowired
-    private TransactionService transactionService;
-    
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
-
+    // Use constructor injection only
+    public BetService(BetRepository betRepository, UserService userService,
+                     TransactionService transactionService, SimpMessagingTemplate messagingTemplate,
+                     ReferralService referralService, AppConfig appConfig,
+                     TransactionRepository transactionRepository, EntityManager entityManager) {
+        this.betRepository = betRepository;
+        this.userService = userService;
+        this.transactionService = transactionService;
+        this.messagingTemplate = messagingTemplate;
+        this.referralService = referralService;
+        this.appConfig = appConfig;
+        this.transactionRepository = transactionRepository;
+        this.entityManager = entityManager;
+    }
     // Basic CRUD operations
     public Page<Bet> findAvailableBets(BetStatus status, Long userId, Pageable pageable) {
         return betRepository.findAvailableBets(status, userId, pageable);
@@ -52,16 +70,22 @@ public class BetService {
         return betRepository.findByIdWithAcceptor(betId);
     }
 
-    // Bet creation
+    // FIXED: Use managed entities and proper transaction boundaries
     @Transactional
-    public Bet createBet(User creator, Integer points, String gameType, String title, String description) {
-        // Validate and hold points
+    public Bet createBet(Long creatorId, Integer points, String gameType, String title, String description) {
+        // Get managed entity
+        User creator = entityManager.find(User.class, creatorId);
+        if (creator == null) {
+            throw new RuntimeException("User not found");
+        }
+
+        // Validate using managed entity
         if (!creator.canAffordBet(points)) {
             throw new RuntimeException("Insufficient points. Available: " + creator.getAvailablePoints());
         }
-        
+
+        // Hold points using managed entity
         creator.holdPoints(points);
-        userService.saveUser(creator);
         
         // Create bet
         Bet bet = new Bet(creator, points, gameType, title);
@@ -77,18 +101,23 @@ public class BetService {
         return savedBet;
     }
 
-    // Bet acceptance
+    // FIXED: Optimistic locking for concurrency control
     @Transactional
-    public Bet acceptBet(Long betId, User acceptor) {
-        Bet bet = betRepository.findById(betId)
+    public Bet acceptBet(Long betId, Long acceptorId) {
+        Bet bet = betRepository.findByIdWithAcceptor(betId)
             .orElseThrow(() -> new RuntimeException("Bet not found"));
         
+        User acceptor = entityManager.find(User.class, acceptorId);
+        if (acceptor == null) {
+            throw new RuntimeException("User not found");
+        }
+
         // Validations
         if (bet.getStatus() != BetStatus.PENDING) {
             throw new RuntimeException("Bet is no longer available");
         }
         
-        if (bet.getCreator().getId().equals(acceptor.getId())) {
+        if (bet.getCreator().getId().equals(acceptorId)) {
             throw new RuntimeException("You cannot accept your own bet");
         }
         
@@ -98,7 +127,6 @@ public class BetService {
         
         // Hold points for acceptor
         acceptor.holdPoints(bet.getPoints());
-        userService.saveUser(acceptor);
         
         // Update bet
         bet.setAcceptor(acceptor);
@@ -113,7 +141,14 @@ public class BetService {
         
         return updatedBet;
     }
-
+    // FIXED: Add retry logic for concurrent updates
+    @Retryable(value = { OptimisticLockingFailureException.class }, maxAttempts = 3)
+    @Transactional
+    public void resolveBetWithRetry(Long betId) {
+        Bet bet = betRepository.findByIdWithAcceptor(betId)
+            .orElseThrow(() -> new RuntimeException("Bet not found"));
+        resolveBet(bet);
+    }
     // Game code sharing
     @Transactional
     public Bet setGameCode(Long betId, String gameCode, String username) {
@@ -189,14 +224,31 @@ public class BetService {
         broadcastResultUpdate(bet, username, result);
     }
 
-    // Bet resolution
+    // Enhanced resolveBet method with commission
     @Transactional
     public void resolveBet(Bet bet) {
         User winner = bet.determineWinner();
+        int totalPot = bet.getPoints() * 2;
         
         if (winner != null) {
-            // Winner gets both stakes
-            winner.awardPoints(bet.getPoints() * 2);
+            // Calculate commissions based on referral
+            double platformFeeRate;
+            if (referralService.hasActiveReferrer(winner)) {
+                platformFeeRate = appConfig.getPlatformFeeWithReferral(); // 3%
+            } else {
+                platformFeeRate = appConfig.getPlatformFeeWithoutReferral(); // 4%
+            }
+            
+            int platformFee = (int) (totalPot * platformFeeRate);
+            int winnerAmount = totalPot - platformFee;
+            
+            // Award winner
+            winner.awardPoints(winnerAmount);
+            
+            // Award referral commission if applicable
+            if (referralService.hasActiveReferrer(winner)) {
+                referralService.awardReferralCommission(winner, totalPot);
+            }
             
             // Update user statistics
             if (winner.getId().equals(bet.getCreator().getId())) {
@@ -420,5 +472,87 @@ public class BetService {
         }
         
         return dto;
+    }
+    // Add this method to your existing BetService class
+    public List<Bet> findByStatus(BetStatus status) {
+        return betRepository.findByStatus(status);
+    }
+    // Updated profit distribution logic
+    @Transactional
+    public void resolveBetWithCommission(Bet bet) {
+        User winner = bet.determineWinner();
+        int totalPot = bet.getPoints() * 2;
+        
+        if (winner != null) {
+            // Calculate commissions
+            double platformFeeRate = hasReferrer(winner) ? 0.03 : 0.04;
+            int platformFee = (int) (totalPot * platformFeeRate);
+            int winnerAmount = totalPot - platformFee;
+            
+            // Award winner
+            winner.awardPoints(winnerAmount);
+            
+            // Handle referral commission
+            if (hasReferrer(winner)) {
+                int referralBonus = (int) (totalPot * 0.01);
+                awardReferralBonus(winner, referralBonus);
+            }
+            
+            // Record platform fee
+            recordPlatformFee(platformFee);
+            
+            // Update user statistics
+            updateUserStats(bet, winner);
+        } else {
+            handleDispute(bet);
+        }
+    }
+    private boolean hasReferrer(User winner) {
+        return referralService.hasActiveReferrer(winner);
+    }
+
+    private void awardReferralBonus(User winner, int referralBonus) {
+        referralService.awardReferralCommission(winner, referralBonus);
+    }
+    private void recordPlatformFee(int platformFee) {
+        // For now, we'll record platform fee as a system transaction
+        // In production, this would go to a system account
+        Transaction platformTransaction = new Transaction();
+        platformTransaction.setPoints(platformFee);
+        platformTransaction.setType(TransactionType.PLATFORM_FEE);
+        platformTransaction.setDescription("Platform fee collected");
+        platformTransaction.setCreatedAt(LocalDateTime.now());
+        // Note: We don't set fromUser/toUser for platform fees as it's system revenue
+        transactionRepository.save(platformTransaction);
+    }
+    private void updateUserStats(Bet bet, User winner) {
+        if (winner.getId().equals(bet.getCreator().getId())) {
+            bet.getCreator().setWins(bet.getCreator().getWins() + 1);
+            bet.getAcceptor().setLosses(bet.getAcceptor().getLosses() + 1);
+        } else {
+            bet.getAcceptor().setWins(bet.getAcceptor().getWins() + 1);
+            bet.getCreator().setLosses(bet.getCreator().getLosses() + 1);
+        }
+        
+        userService.saveUser(bet.getCreator());
+        userService.saveUser(bet.getAcceptor());
+    }
+    private void handleDispute(Bet bet) {
+        // Refund both players
+        bet.getCreator().releasePoints(bet.getPoints());
+        if (bet.getAcceptor() != null) {
+            bet.getAcceptor().releasePoints(bet.getPoints());
+        }
+        
+        bet.setStatus(BetStatus.DISPUTED);
+        bet.setDisputeReason("Results conflict - requires admin review");
+        
+        userService.saveUser(bet.getCreator());
+        if (bet.getAcceptor() != null) {
+            userService.saveUser(bet.getAcceptor());
+        }
+        
+        // Record refund transactions
+        transactionService.recordBetRefund(bet);
     }
 }

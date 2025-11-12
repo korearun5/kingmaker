@@ -1,0 +1,90 @@
+<div th:fragment="content">
+    <!-- Stats Section -->
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-10 col-lg-8">
+                <div class="row mb-4">
+                    <div class="col-12 col-sm-4 mb-3">
+                        <div class="stat-card text-white" style="background: linear-gradient(45deg, #3498db, #2980b9);">
+                            <div class="card-body text-center py-4">
+                                <i class="fas fa-trophy fa-2x mb-2"></i>
+                                <h5>Total Wins</h5>
+                                <h2 th:text="${user?.wins ?: '0'}">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-4 mb-3">
+                        <div class="stat-card text-white" style="background: linear-gradient(45deg, #e74c3c, #c0392b);">
+                            <div class="card-body text-center py-4">
+                                <i class="fas fa-times-circle fa-2x mb-2"></i>
+                                <h5>Total Losses</h5>
+                                <h2 th:text="${user?.losses ?: '0'}">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-4 mb-3">
+                        <div class="stat-card text-white" style="background: linear-gradient(45deg, #9b59b6, #8e44ad);">
+                            <div class="card-body text-center py-4">
+                                <i class="fas fa-chart-line fa-2x mb-2"></i>
+                                <h5>Total Games</h5>
+                                <h2 th:text="${(user?.wins ?: 0) + (user?.losses ?: 0)}">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Points Card -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="stat-card text-white" style="background: linear-gradient(45deg, #f39c12, #e67e22);">
+                            <div class="card-body text-center py-4">
+                                <i class="fas fa-coins fa-2x mb-2"></i>
+                                <h5>Available Points</h5>
+                                <h2 th:text="${user?.availablePoints ?: '1000'}">1000</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6 col-md-3 mb-3">
+                                        <a href="/user/play" class="btn btn-outline-primary btn-lg w-100">
+                                            <i class="fas fa-gamepad fa-2x mb-2"></i><br>
+                                            Play
+                                        </a>
+                                    </div>
+                                    <div class="col-6 col-md-3 mb-3">
+                                        <a href="/user/buy-points" class="btn btn-outline-success btn-lg w-100">
+                                            <i class="fas fa-shopping-cart fa-2x mb-2"></i><br>
+                                            Buy Points
+                                        </a>
+                                    </div>
+                                    <div class="col-6 col-md-3 mb-3">
+                                        <a href="/user/withdraw" class="btn btn-outline-warning btn-lg w-100">
+                                            <i class="fas fa-wallet fa-2x mb-2"></i><br>
+                                            Withdraw
+                                        </a>
+                                    </div>
+                                    <div class="col-6 col-md-3 mb-3">
+                                        <a href="/user/refer" class="btn btn-outline-info btn-lg w-100">
+                                            <i class="fas fa-share-alt fa-2x mb-2"></i><br>
+                                            Refer & Earn
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

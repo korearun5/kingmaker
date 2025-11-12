@@ -1,0 +1,28 @@
+#!/bin/bash
+# .git/hooks/pre-commit
+
+echo "🔍 Running pre-commit checks..."
+
+# Run tests
+mvn test -q
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed. Commit aborted."
+    exit 1
+fi
+
+# Check code coverage
+COVERAGE=$(mvn jacoco:check -q | grep -o 'covered ratio of [0-9]*\.[0-9]*' | cut -d' ' -f4)
+if (( $(echo "$COVERAGE < 0.90" | bc -l) )); then
+    echo "❌ Code coverage below 90%. Current: ${COVERAGE}%"
+    exit 1
+fi
+
+# Check code quality
+mvn checkstyle:check -q
+if [ $? -ne 0 ]; then
+    echo "❌ Checkstyle violations found."
+    exit 1
+fi
+
+echo "✅ All checks passed. Committing..."
+exit 0

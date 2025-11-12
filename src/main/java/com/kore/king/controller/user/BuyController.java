@@ -21,12 +21,12 @@ import com.kore.king.service.UserService;
 
 @Controller
 @RequestMapping("/user")
-public class UserPaymentController {
+public class BuyController {
 
     private final PaymentService paymentService;
     private final UserService userService;
 
-    public UserPaymentController(PaymentService paymentService, UserService userService) {
+    public BuyController(PaymentService paymentService, UserService userService) {
         this.paymentService = paymentService;
         this.userService = userService;
     }

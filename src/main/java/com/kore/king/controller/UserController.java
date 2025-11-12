@@ -43,7 +43,6 @@ public class UserController {
     public String gameIdsPage(Authentication authentication, Model model) {
         return getUserPage(authentication, model, "Game IDs", "user/game-ids-content");
     }
-
     @GetMapping("/support")
     public String supportPage(Authentication authentication, Model model) {
         return getUserPage(authentication, model, "Support", "user/support-content");

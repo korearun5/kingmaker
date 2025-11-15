@@ -1,66 +1,117 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+<html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${pageTitle} + ' - Admin Panel'">Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
             --admin-primary: #8B0000;
             --admin-secondary: #B22222;
-            --admin-success: #228B22;
-            --admin-warning: #FF8C00;
-            --admin-danger: #DC143C;
-            --sidebar-width: 280px;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            --admin-sidebar-width: 280px;
+            --header-height: 70px;
         }
         
         body {
             background-color: #f8f9fa;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        .admin-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: var(--sidebar-width);
-            height: 100vh;
+
+        button:focus,
+        a:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Custom Hamburger Menu Icon */
+        .hamburger-menu {
+            width: 24px;
+            height: 18px;
+            position: relative;
+            transform: rotate(0deg);
+            transition: .5s ease-in-out;
+            cursor: pointer;
+        }
+
+        .hamburger-menu span {
+            display: block;
+            position: absolute;
+            height: 3px;
+            width: 100%;
             background: var(--admin-primary);
-            color: white;
+            border-radius: 3px;
+            opacity: 1;
+            left: 0;
+            transform: rotate(0deg);
+            transition: .25s ease-in-out;
+        }
+
+        .hamburger-menu span:nth-child(1) {
+            top: 0px;
+        }
+
+        .hamburger-menu span:nth-child(2) {
+            top: 7px;
+        }
+
+        .hamburger-menu span:nth-child(3) {
+            top: 14px;
+        }
+
+        /* Custom Icons for Admin Sidebar */
+        .custom-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.75rem;
+            display: inline-block;
+            position: relative;
+        }
+
+        .icon-dashboard::before { content: "📊"; }
+        .icon-users::before { content: "👥"; }
+        .icon-payments::before { content: "💳"; }
+        .icon-transactions::before { content: "🔄"; }
+        .icon-support::before { content: "💬"; }
+        .icon-id::before { content: "🆔"; }
+        .icon-settings::before { content: "⚙️"; }
+        .icon-add-user::before { content: "➕"; }
+        .icon-logout::before { content: "🚪"; }
+        .icon-back::before { content: "⬅️"; }
+
+        .admin-sidebar {
+            width: 0;
+            background: var(--admin-primary);
+            transition: all 0.3s ease;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
             z-index: 1000;
             overflow-y: auto;
+            overflow-x: hidden;
         }
-        
-        .admin-sidebar-header {
-            padding: 1.5rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
+
+        .admin-sidebar.active {
+            width: var(--admin-sidebar-width);
         }
-        
-        .admin-sidebar-brand {
-            color: white;
-            font-size: 1.5rem;
-            font-weight: bold;
-            text-decoration: none;
-        }
-        
+
         .admin-sidebar-menu {
             list-style: none;
             padding: 1rem 0;
+            margin-top: 1rem;
+            width: var(--admin-sidebar-width);
         }
-        
+
         .admin-sidebar-menu li {
             margin: 0.5rem 0;
         }
-        
+
         .admin-sidebar-menu a {
             color: #e0e0e0;
             text-decoration: none;
@@ -70,180 +121,206 @@
             transition: all 0.3s ease;
             border-left: 3px solid transparent;
         }
-        
+
         .admin-sidebar-menu a:hover,
         .admin-sidebar-menu a.active {
             background: rgba(255,255,255,0.1);
             color: white;
-            border-left-color: var(--admin-warning);
+            border-left-color: #FF8C00;
         }
-        
-        .admin-sidebar-menu i {
-            width: 20px;
-            margin-right: 0.75rem;
-            font-size: 1.1rem;
-        }
-        
-        .admin-main-content {
-            margin-left: var(--sidebar-width);
-            padding: 2rem;
-            min-height: 100vh;
-        }
-        
+
         .admin-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
             background: white;
             padding: 1rem 2rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-            border-radius: 10px;
+            z-index: 999;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: var(--header-height);
         }
-        
-        .admin-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+
+        .admin-header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
-        
-        .admin-stat-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            padding: 1.5rem;
-            border-left: 4px solid var(--admin-primary);
-        }
-        
-        .admin-table-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .admin-table-card .card-header {
-            background: var(--admin-primary);
-            color: white;
+
+        .admin-sidebar-toggle {
+            background: none;
             border: none;
-            padding: 1rem 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        
-        /* Mobile Styles */
+
+        .admin-sidebar-toggle:hover {
+            background-color: #f8f9fa;
+        }
+
+        .admin-main-content {
+            flex: 1;
+            padding: 2rem;
+            margin-top: var(--header-height);
+            min-height: calc(100vh - var(--header-height));
+            transition: margin-left 0.3s ease;
+        }
+
+        .admin-sidebar.active ~ .admin-main-content {
+            margin-left: var(--admin-sidebar-width);
+        }
+
+        .admin-sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 998;
+            display: none;
+        }
+
+        .admin-sidebar.active ~ .admin-sidebar-overlay {
+            display: block;
+        }
+
         @media (max-width: 768px) {
-            .admin-sidebar {
-                width: 100%;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-            }
-            
-            .admin-sidebar.active {
-                transform: translateX(0);
-            }
-            
-            .admin-main-content {
-                margin-left: 0;
+            .admin-header {
                 padding: 1rem;
             }
             
-            .admin-mobile-toggle {
-                position: fixed;
-                top: 1rem;
-                left: 1rem;
-                background: var(--admin-primary);
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 0.5rem;
-                z-index: 1001;
-                cursor: pointer;
+            .admin-main-content {
+                padding: 1rem;
+                margin-left: 0 !important;
             }
+            
+            .admin-sidebar.active {
+                width: 100%;
+            }
+            
+            .admin-sidebar-menu {
+                width: 100%;
+            }
+        }
+
+        .admin-stat-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            margin-bottom: 1rem;
+        }
+
+        .admin-stat-card:hover {
+            transform: translateY(-2px);
         }
     </style>
 </head>
 <body>
-    <!-- Mobile Toggle Button -->
-    <button class="admin-mobile-toggle d-md-none" id="adminMobileToggle">
-        <i class="fas fa-bars"></i>
-    </button>
+    <div class="admin-sidebar-overlay" id="adminSidebarOverlay"></div>
 
-    <!-- Admin Sidebar -->
-    <nav class="admin-sidebar" id="adminSidebar">
-        <div class="admin-sidebar-header">
-            <a href="/admin/dashboard" class="admin-sidebar-brand">
-                <i class="fas fa-shield-alt me-2"></i>Admin Panel
-            </a>
+    <div class="app-container">
+        <nav class="admin-sidebar" id="adminSidebar">
+            <ul class="admin-sidebar-menu">
+                <li><a href="/admin/dashboard">
+                    <span class="custom-icon icon-dashboard"></span>Dashboard</a></li>
+                    
+                <li><a href="/admin/users">
+                    <span class="custom-icon icon-users"></span>User Management</a></li>
+                    
+                <li><a href="/admin/payments">
+                    <span class="custom-icon icon-payments"></span>Payment Requests</a></li>
+                    
+                <li><a href="/admin/transactions">
+                    <span class="custom-icon icon-transactions"></span>Transactions</a></li>
+                    
+                <li><a href="/admin/support">
+                    <span class="custom-icon icon-support"></span>Support Tickets</a></li>
+                    
+                <li><a href="/admin/game-ids">
+                    <span class="custom-icon icon-id"></span>Game IDs</a></li>
+                    
+                <li><a href="/admin/settings">
+                    <span class="custom-icon icon-settings"></span>System Settings</a></li>
+                    
+                <li><a href="/admin/create-admin">
+                    <span class="custom-icon icon-add-user"></span>Create Admin</a></li>
+                
+                <li class="logout-item">
+                    <a href="#" onclick="event.preventDefault(); document.getElementById('admin-logout-form').submit();">
+                        <span class="custom-icon icon-logout"></span>Logout
+                    </a>
+                </li>
+                    
+                <li><a href="/dashboard">
+                    <span class="custom-icon icon-back"></span>Back to User View</a></li>
+            </ul>
+
+            <form id="admin-logout-form" th:action="@{/logout}" method="post" style="display: none;"></form>
+        </nav>
+
+        <div class="admin-header">
+            <div class="admin-header-left">
+                <button class="admin-sidebar-toggle" id="adminSidebarToggle">
+                    <div class="hamburger-menu">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </button>
+            </div>
         </div>
 
-        <!-- Admin Menu -->
-        <ul class="admin-sidebar-menu">
-            <li><a href="/admin/dashboard" th:classappend="${#httpServletRequest.requestURI == '/admin/dashboard'} ? 'active' : ''">
-                <i class="fas fa-chart-bar"></i>Dashboard</a></li>
-                
-            <li><a href="/admin/users" th:classappend="${#httpServletRequest.requestURI == '/admin/users'} ? 'active' : ''">
-                <i class="fas fa-users-cog"></i>User Management</a></li>
-                
-            <li sec:authorize="hasRole('MAIN_ADMIN')"><a href="/admin/payments" th:classappend="${#httpServletRequest.requestURI == '/admin/payments'} ? 'active' : ''">
-                <i class="fas fa-credit-card"></i>Payment Requests</a></li>
-                
-            <li><a href="/admin/transactions" th:classappend="${#httpServletRequest.requestURI == '/admin/transactions'} ? 'active' : ''">
-                <i class="fas fa-exchange-alt"></i>Transactions</a></li>
-                
-            <li><a href="/admin/support" th:classappend="${#httpServletRequest.requestURI == '/admin/support'} ? 'active' : ''">
-                <i class="fas fa-headset"></i>Support Tickets</a></li>
-                
-            <li><a href="/admin/game-ids" th:classappend="${#httpServletRequest.requestURI == '/admin/game-ids'} ? 'active' : ''">
-                <i class="fas fa-id-card"></i>Game IDs</a></li>
-                
-            <li sec:authorize="hasRole('MAIN_ADMIN')"><a href="/admin/settings" th:classappend="${#httpServletRequest.requestURI == '/admin/settings'} ? 'active' : ''">
-                <i class="fas fa-sliders-h"></i>System Settings</a></li>
-                
-            <li sec:authorize="hasRole('MAIN_ADMIN')"><a href="/admin/create-admin" th:classappend="${#httpServletRequest.requestURI == '/admin/create-admin'} ? 'active' : ''">
-                <i class="fas fa-user-plus"></i>Create Admin</a></li>
-                
-            <li><a href="/dashboard">
-                <i class="fas fa-arrow-left"></i>Back to User View</a></li>
-        </ul>
-    </nav>
+        <main class="admin-main-content">
+            <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span class="custom-icon">✅</span>
+                <span th:text="${success}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
 
-    <!-- Main Content -->
-    <main class="admin-main-content" id="adminMainContent">
-        <!-- Flash Messages -->
-        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fas fa-check-circle me-2"></i>
-            <span th:text="${success}"></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+            <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <span class="custom-icon">❌</span>
+                <span th:text="${error}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
 
-        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-circle me-2"></i>
-            <span th:text="${error}"></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-
-        <!-- Page Specific Content -->
-        <div th:insert="${content}"></div>
-    </main>
+            <div th:replace="${content}"></div>
+        </main>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Admin sidebar functionality
         document.addEventListener('DOMContentLoaded', function() {
             const adminSidebar = document.getElementById('adminSidebar');
-            const adminMobileToggle = document.getElementById('adminMobileToggle');
-            const adminMainContent = document.getElementById('adminMainContent');
+            const adminSidebarToggle = document.getElementById('adminSidebarToggle');
+            const adminSidebarOverlay = document.getElementById('adminSidebarOverlay');
 
-            // Mobile menu toggle
-            adminMobileToggle.addEventListener('click', function() {
+            adminSidebarToggle.addEventListener('click', function() {
                 adminSidebar.classList.toggle('active');
             });
 
-            // Close sidebar when clicking outside on mobile
-            adminMainContent.addEventListener('click', function() {
-                if (window.innerWidth < 768 && adminSidebar.classList.contains('active')) {
-                    adminSidebar.classList.remove('active');
-                }
+            adminSidebarOverlay.addEventListener('click', function() {
+                adminSidebar.classList.remove('active');
             });
 
-            // Set active menu item
+            if (window.innerWidth < 768) {
+                const sidebarLinks = document.querySelectorAll('.admin-sidebar-menu a');
+                sidebarLinks.forEach(link => {
+                    link.addEventListener('click', function() {
+                        adminSidebar.classList.remove('active');
+                    });
+                });
+            }
+
             function setActiveMenuItem() {
                 const currentPath = window.location.pathname;
                 const menuItems = document.querySelectorAll('.admin-sidebar-menu a');

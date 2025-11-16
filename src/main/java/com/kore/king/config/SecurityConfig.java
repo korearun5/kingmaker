@@ -61,7 +61,7 @@ public class SecurityConfig {
             // CSRF Configuration
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers("/ws/**", "/api/**") // Only exclude necessary endpoints
+                .ignoringRequestMatchers("/ws/**", "/api/**", "/bets/**") // Only exclude necessary endpoints
             )
             
             // Session Management

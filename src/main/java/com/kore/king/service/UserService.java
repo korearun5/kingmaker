@@ -38,7 +38,7 @@ public class UserService {
     public User saveUser(User user) {
         return userRepository.save(user);
     }
-    
+    //@Cacheable(value = "users", key = "#username")
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }

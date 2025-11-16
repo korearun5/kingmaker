@@ -1,13 +1,11 @@
 package com.kore.king.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.kore.king.entity.Bet;
@@ -19,11 +17,41 @@ import com.kore.king.service.UserService;
 @RequestMapping("/bets")
 public class BetManagementController {
 
-    @Autowired
-    private BetService betService;
+    private final BetService betService;
+    private final UserService userService;
 
-    @Autowired
-    private UserService userService;
+    public BetManagementController(BetService betService, UserService userService) {
+        this.betService = betService;
+        this.userService = userService;
+    }
+
+    @PostMapping("/create")
+    public String createBet(@RequestParam Integer points,
+                        @RequestParam String gameType,
+                        @RequestParam(required = false) String title,
+                        Authentication authentication,
+                        RedirectAttributes redirectAttributes) {
+        try {
+            String username = authentication.getName();
+            User creator = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Use provided title or generate default
+            String betTitle = (title != null && !title.trim().isEmpty()) ? 
+                            title : gameType + " Bet - " + creator.getUsername();
+            
+            String conditions = "Standard " + gameType + " match rules";
+            
+            Bet createdBet = betService.createBet(creator.getId(), points, gameType, betTitle, conditions);
+            
+            redirectAttributes.addFlashAttribute("success", "Bet created successfully!");
+            
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        
+        return "redirect:/user/play";
+    }
 
     @PostMapping("/{id}/accept")
     public String acceptBet(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
@@ -39,12 +67,12 @@ public class BetManagementController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         
-        return "redirect:/user/dashboard-content";
+        return "redirect:/user/play";
     }
 
     @PostMapping("/{id}/set-game-code")
     public String setGameCode(@PathVariable Long id, @RequestParam String gameCode, 
-                            Authentication authentication, RedirectAttributes redirectAttributes) {
+                        Authentication authentication, RedirectAttributes redirectAttributes) {
         try {
             String username = authentication.getName();
             betService.setGameCode(id, gameCode, username);
@@ -54,31 +82,7 @@ public class BetManagementController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         
-        return "redirect:/user/dashboard-content";
-    }
-
-    @PostMapping("/{id}/submit-result")
-    public String submitResult(@PathVariable Long id, @RequestParam String result,
-                             @RequestParam(required = false) MultipartFile screenshot,
-                             Authentication authentication, RedirectAttributes redirectAttributes) {
-        try {
-            String username = authentication.getName();
-            Bet bet = betService.findById(id).orElseThrow(() -> new RuntimeException("Bet not found"));
-            boolean isCreator = bet.getCreator().getUsername().equals(username);
-
-            String screenshotName = null;
-            if ("WIN".equals(result) && screenshot != null && !screenshot.isEmpty()) {
-                screenshotName = storeScreenshot(screenshot);
-            }
-
-            betService.submitResult(id, username, result, screenshotName, isCreator);
-            redirectAttributes.addFlashAttribute("success", "Result submitted successfully!");
-            
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
-        }
-        
-        return "redirect:/user/dashboard-content";
+        return "redirect:/user/play";
     }
 
     @PostMapping("/{id}/cancel")
@@ -92,12 +96,6 @@ public class BetManagementController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         
-        return "redirect:/user/dashboard-content";
-    }
-
-    private String storeScreenshot(MultipartFile screenshot) {
-        // Simple implementation - store original filename
-        // In production, use FileStorageService
-        return screenshot.getOriginalFilename();
+        return "redirect:/user/play";
     }
 }

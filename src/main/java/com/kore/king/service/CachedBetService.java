@@ -1,12 +1,13 @@
 package com.kore.king.service;
 
-import com.kore.king.entity.Bet;
-import com.kore.king.entity.BetStatus;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import com.kore.king.entity.Bet;
+import com.kore.king.entity.BetStatus;
 
 @Service
 public class CachedBetService {
@@ -39,6 +40,6 @@ public class CachedBetService {
 
     @CacheEvict(value = "userStats", allEntries = true)
     public void resolveBet(Bet bet) {
-        betService.resolveBet(bet);
+        betService.resolveBetWithRetry(bet.getId());
     }
 }

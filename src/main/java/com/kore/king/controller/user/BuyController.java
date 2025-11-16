@@ -33,17 +33,24 @@ public class BuyController {
 
     @GetMapping("/buy-points")
     public String buyPoints(Authentication authentication, Model model) {
-        String username = authentication.getName();
-        User user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        try {
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<PaymentRequest> paymentHistory = paymentService.getUserPaymentRequests(user.getId());
+            List<PaymentRequest> paymentHistory = paymentService.getUserPaymentRequests(user.getId());
 
-        model.addAttribute("user", user);
-        model.addAttribute("paymentHistory", paymentHistory);
-        model.addAttribute("paymentMethods", PaymentMethod.values());
-        model.addAttribute("pageTitle", "Buy Points");
-        return "user/buy-points-content";
+            model.addAttribute("user", user);
+            model.addAttribute("paymentHistory", paymentHistory);
+            model.addAttribute("paymentMethods", PaymentMethod.values());
+            model.addAttribute("pageTitle", "Buy Points");
+            model.addAttribute("content", "user/buy-points-content");
+            return "layouts/user-layout";
+        } catch (Exception e) {
+            model.addAttribute("error", "Error loading buy points: " + e.getMessage());
+            model.addAttribute("content", "user/dashboard-content");
+            return "layouts/user-layout";
+        }
     }
 
     @PostMapping("/buy-points/request")
@@ -64,7 +71,7 @@ public class BuyController {
             // Validate file
             if (screenshot.isEmpty()) {
                 redirectAttributes.addFlashAttribute("error", "Screenshot is required");
-                return "redirect:/buy-points-content";
+                return "redirect:/user/buy-points";
             }
 
             // Create payment request
@@ -87,6 +94,6 @@ public class BuyController {
             redirectAttributes.addFlashAttribute("error", "An unexpected error occurred");
         }
 
-        return "redirect:/user/buy-points-content";
+        return "redirect:/user/buy-points";
     }
 }

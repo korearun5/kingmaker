@@ -1,7 +1,7 @@
-package com.kore.king.entity;
+    package com.kore.king.entity;
 
-public enum Result {
-    PENDING,
-    WIN,
-    LOSE
-}
+    public enum Result {
+        PENDING,
+        WIN,
+        LOSE
+    }

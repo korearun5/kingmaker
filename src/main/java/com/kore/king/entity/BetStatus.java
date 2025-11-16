@@ -1,11 +1,11 @@
 package com.kore.king.entity;
 
 public enum BetStatus {
-    PENDING,        // Bet created, waiting for acceptance
-    ACCEPTED,       // Bet accepted, waiting for game code  
-    CODE_SHARED,    // Game code shared, waiting for results || IN_PROGRESS
-    RESULTS_SUBMITTED, // Results submitted, waiting for verification
-    COMPLETED,      // Bet completed and points transferred
+    PENDING,        // Bet created, waiting for acceptor
+    ACCEPTED,       // Bet accepted by opponent
+    CODE_SHARED,    // Game code shared by creator
+    RESULTS_SUBMITTED, // One or both results submitted
+    COMPLETED,      // Bet resolved with winner
     CANCELLED,      // Bet cancelled
-    DISPUTED        // Results disputed
+    DISPUTED        // Results conflict
 }

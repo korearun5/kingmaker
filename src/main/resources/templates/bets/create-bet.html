@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Bet</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Create New Bet</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Your current points: <strong th:text="${userPoints}">0</strong>
+                        </div>
+
+                        <form th:action="@{/bets/create}" method="post">
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Bet Title</label>
+                                <input type="text" class="form-control" id="title" name="title" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="points" class="form-label">Bet Points</label>
+                                <input type="number" class="form-control" id="points" name="points" 
+                                       min="1" th:attr="max=${userPoints}" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="gameType" class="form-label">Game Type</label>
+                                <select class="form-select" id="gameType" name="gameType" required>
+                                    <option value="FIFA">FIFA</option>
+                                    <option value="Call of Duty">Call of Duty</option>
+                                    <option value="Fortnite">Fortnite</option>
+                                    <option value="Apex Legends">Apex Legends</option>
+                                    <option value="Valorant">Valorant</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="conditions" class="form-label">Game Conditions</label>
+                                <textarea class="form-control" id="conditions" name="conditions" rows="3" required></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Create Bet</button>
+                            <a href="/user/dashboard-content" class="btn btn-secondary">Cancel</a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

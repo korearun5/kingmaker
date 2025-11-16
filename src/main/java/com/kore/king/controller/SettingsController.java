@@ -35,28 +35,29 @@ public class SettingsController {
             return "layouts/user-layout";
         } catch (Exception e) {
             model.addAttribute("error", "Error loading settings: " + e.getMessage());
-            return "error";
+            model.addAttribute("content", "user/dashboard-content");
+            return "layouts/user-layout";
         }
     }
 
-    @PostMapping("settings/change-password")
+    @PostMapping("/settings/change-password")
     public String changePassword(@RequestParam String currentPassword,
-                            @RequestParam String newPassword,
-                            @RequestParam String confirmPassword,
-                            Authentication authentication,
-                            RedirectAttributes redirectAttributes) {
+                                 @RequestParam String newPassword,
+                                 @RequestParam String confirmPassword,
+                                 Authentication authentication,
+                                 RedirectAttributes redirectAttributes) {
         try {
             String username = authentication.getName();
             
             // Validation
             if (!newPassword.equals(confirmPassword)) {
                 redirectAttributes.addFlashAttribute("error", "New passwords do not match");
-                return "redirect:/user/settings-content";
+                return "redirect:/user/settings";
             }
             
             if (newPassword.length() < 6) {
                 redirectAttributes.addFlashAttribute("error", "New password must be at least 6 characters long");
-                return "redirect:/user/settings-content";
+                return "redirect:/user/settings";
             }
             
             boolean success = userService.changePassword(username, currentPassword, newPassword);
@@ -71,6 +72,6 @@ public class SettingsController {
             redirectAttributes.addFlashAttribute("error", "An unexpected error occurred");
         }
         
-        return "redirect:/user/settings-content";
+        return "redirect:/user/settings";
     }
 }

@@ -30,7 +30,7 @@ public class DashboardController {
             return "layouts/user-layout"; 
         } catch (Exception e) {
             model.addAttribute("error", "Error loading dashboard: " + e.getMessage());
-            return "error";
+            return "layouts/user-layout"; // Return to layout even on error
         }
     }
 }

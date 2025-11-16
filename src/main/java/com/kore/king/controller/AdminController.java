@@ -26,39 +26,54 @@ public class AdminController {
 
     @GetMapping("/dashboard")
     public String adminDashboard(Authentication authentication, Model model) {
-        String username = authentication.getName();
-        User user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        model.addAttribute("user", user);
-        model.addAttribute("pageTitle", "Admin Dashboard");
-        model.addAttribute("content", "admin/dashboard-content");
-        return "layouts/admin-layout"; 
+        try {
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            model.addAttribute("user", user);
+            model.addAttribute("pageTitle", "Admin Dashboard");
+            model.addAttribute("content", "admin/dashboard-content");
+            return "layouts/admin-layout"; 
+        } catch (Exception e) {
+            model.addAttribute("error", "Error loading admin dashboard: " + e.getMessage());
+            return "layouts/admin-layout";
+        }
     }
 
     @GetMapping("/users")
     public String userManagement(Authentication authentication, Model model) {
-        String username = authentication.getName();
-        User user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        model.addAttribute("user", user);
-        model.addAttribute("users", userService.getAllUsers());
-        model.addAttribute("pageTitle", "User Management");
-        model.addAttribute("content", "admin/users-content");
-        return "layouts/admin-layout"; // Uses admin-layout
+        try {
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            model.addAttribute("user", user);
+            model.addAttribute("users", userService.getAllUsers());
+            model.addAttribute("pageTitle", "User Management");
+            model.addAttribute("content", "admin/users-content");
+            return "layouts/admin-layout";
+        } catch (Exception e) {
+            model.addAttribute("error", "Error loading user management: " + e.getMessage());
+            return "layouts/admin-layout";
+        }
     }
 
     @GetMapping("/create-admin")
     public String showCreateAdminForm(Authentication authentication, Model model) {
-        String username = authentication.getName();
-        User user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        model.addAttribute("user", user);
-        model.addAttribute("pageTitle", "Create Admin");
-        model.addAttribute("content", "admin/create-admin-content");
-        return "layouts/admin-layout"; // Uses admin-layout
+        try {
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            model.addAttribute("user", user);
+            model.addAttribute("pageTitle", "Create Admin");
+            model.addAttribute("content", "admin/create-admin-content");
+            return "layouts/admin-layout";
+        } catch (Exception e) {
+            model.addAttribute("error", "Error loading create admin: " + e.getMessage());
+            return "layouts/admin-layout";
+        }
     }
 
     @PostMapping("/users/promote")
@@ -73,7 +88,7 @@ public class AdminController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Error promoting user: " + e.getMessage());
         }
-        return "redirect:/admin/users-content";
+        return "redirect:/admin/users";
     }
 
     @PostMapping("/users/demote")
@@ -88,6 +103,6 @@ public class AdminController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Error demoting user: " + e.getMessage());
         }
-        return "redirect:/admin/users-content";
+        return "redirect:/admin/users";
     }
 }

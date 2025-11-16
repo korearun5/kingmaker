@@ -81,16 +81,16 @@
                         <div th:if="${allBets != null and !allBets.empty}" class="row">
                             <div th:each="bet : ${allBets.content}" class="col-md-6 col-lg-4 mb-3">
                                 <div th:class="'card h-100 shadow-sm ' + 
-                                    (${bet.creator.username == user.username} ? 'border-primary' : 
-                                    (${bet.status == 'PENDING'} ? 'border-warning' : 'border-secondary'))">
+                                    (${bet.creator != null and bet.creator.username == user.username} ? 'border-primary' : 
+                                    (${bet.status.name() == 'PENDING'} ? 'border-warning' : 'border-secondary'))">
                                     <div class="card-body">
                                         <!-- Bet Header -->
                                         <div class="d-flex justify-content-between align-items-start mb-2">
                                             <h6 class="card-title mb-0 text-truncate" th:text="${bet.title}">Bet Title</h6>
                                             <span class="badge" 
-                                                th:classappend="${bet.status == 'PENDING'} ? 'bg-warning text-dark' : 
-                                                                (${bet.status == 'ACCEPTED'} ? 'bg-success' : 
-                                                                (${bet.status == 'CODE_SHARED'} ? 'bg-info' : 'bg-secondary'))"
+                                                th:classappend="${bet.status.name() == 'PENDING'} ? 'bg-warning text-dark' : 
+                                                                (${bet.status.name() == 'ACCEPTED'} ? 'bg-success' : 
+                                                                (${bet.status.name() == 'CODE_SHARED'} ? 'bg-info' : 'bg-secondary'))"
                                                 th:text="${bet.status}">Status</span>
                                         </div>
                                         
@@ -107,8 +107,10 @@
                                             <div class="small text-muted mb-1">
                                                 <i class="fas fa-user me-1"></i>
                                                 <strong>By:</strong> 
-                                                <span th:class="${bet.creator.username == user.username} ? 'text-primary fw-bold' : ''"
+                                                <span th:if="${bet.creator != null}" 
+                                                      th:class="${bet.creator.username == user.username} ? 'text-primary fw-bold' : ''"
                                                       th:text="${bet.creator.username}">User</span>
+                                                <span th:if="${bet.creator == null}" class="text-danger">Unknown User</span>
                                             </div>
                                             <div class="small text-muted" th:if="${bet.acceptor != null}">
                                                 <i class="fas fa-users me-1"></i>
@@ -135,28 +137,27 @@
                                         <!-- Action Buttons -->
                                         <div class="action-buttons">
                                             <!-- Accept Button (for other users when pending) -->
-<!-- Accept Button (for other users when pending) -->
-<div th:if="${bet.status == 'PENDING'}">
-    <div th:if="${bet.creator.username != user.username}">
-        <form th:action="@{/bets/{id}/accept(id=${bet.id})}" method="post" class="mb-2">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <button type="submit" class="btn btn-success btn-sm w-100" 
-                    th:disabled="${userPoints < bet.points}"
-                    th:attr="data-bs-toggle=${userPoints < bet.points} ? 'tooltip' : ''"
-                    th:title="${userPoints < bet.points} ? 'You need ' + ${bet.points} + ' points to accept this bet' : ''">
-                <i class="fas fa-check me-1"></i>
-                <span th:if="${userPoints >= bet.points}">Accept Bet</span>
-                <span th:if="${userPoints < bet.points}">Need <span th:text="${bet.points}"></span> points</span>
-            </button>
-        </form>
-    </div>
-    <div th:if="${bet.creator.username == user.username}" class="text-center">
-        <small class="text-muted">Waiting for someone to accept your bet...</small>
-    </div>
-</div>
+                                            <div th:if="${bet.status.name() == 'PENDING'}">
+                                                <div th:if="${bet.creator != null and bet.creator.username != user.username}">
+                                                    <form th:action="@{/bets/{id}/accept(id=${bet.id})}" method="post" class="mb-2">
+                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                                        <button type="submit" class="btn btn-success btn-sm w-100" 
+                                                                th:disabled="${userPoints < bet.points}"
+                                                                th:attr="data-bs-toggle=${userPoints < bet.points} ? 'tooltip' : ''"
+                                                                th:title="${userPoints < bet.points} ? 'You need ' + ${bet.points} + ' points to accept this bet' : ''">
+                                                            <i class="fas fa-check me-1"></i>
+                                                            <span th:if="${userPoints >= bet.points}">Accept Bet</span>
+                                                            <span th:if="${userPoints < bet.points}">Need <span th:text="${bet.points}"></span> points</span>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                                <div th:if="${bet.creator != null and bet.creator.username == user.username}" class="text-center">
+                                                    <small class="text-muted">Waiting for someone to accept your bet...</small>
+                                                </div>
+                                            </div>
 
                                             <!-- Cancel Button (for creator when pending) -->
-                                            <div th:if="${bet.status == 'PENDING' and bet.creator.username == user.username}">
+                                            <div th:if="${bet.status.name() == 'PENDING' and bet.creator != null and bet.creator.username == user.username}">
                                                 <form th:action="@{/bets/{id}/cancel(id=${bet.id})}" method="post" 
                                                       onsubmit="return confirmCancel('pending')" class="mb-2">
                                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -167,7 +168,7 @@
                                             </div>
 
                                             <!-- Share Code Button (for creator when accepted) -->
-                                            <div th:if="${bet.status == 'ACCEPTED' and bet.creator.username == user.username and bet.gameCode == null}">
+                                            <div th:if="${bet.status.name() == 'ACCEPTED' and bet.creator != null and bet.creator.username == user.username and bet.gameCode == null}">
                                                 <form th:action="@{/bets/{id}/set-game-code(id=${bet.id})}" method="post" class="mb-2">
                                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                                                     <div class="input-group input-group-sm">
@@ -183,9 +184,66 @@
                                                 </form>
                                             </div>
 
+                                            <!-- Submit Result Forms (when code is shared) -->
+                                            <div th:if="${bet.status.name() == 'CODE_SHARED'}">
+                                                <!-- Creator Result Form -->
+                                                <div th:if="${bet.creator != null and bet.creator.username == user.username and bet.creatorResult == null}" class="mb-2">
+                                                    <form th:action="@{/bets/{id}/submit-result(id=${bet.id})}" method="post">
+                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                                        <input type="hidden" name="isCreator" value="true" />
+                                                        <div class="input-group input-group-sm">
+                                                            <select class="form-select" name="result" required>
+                                                                <option value="">Select Result</option>
+                                                                <option value="WIN">Win</option>
+                                                                <option value="LOSS">Loss</option>
+                                                                <option value="DRAW">Draw</option>
+                                                            </select>
+                                                            <button type="submit" class="btn btn-warning">
+                                                                <i class="fas fa-flag me-1"></i>Submit Result
+                                                            </button>
+                                                        </div>
+                                                        <div class="form-text small">Submit your game result</div>
+                                                    </form>
+                                                </div>
+                                                
+                                                <!-- Acceptor Result Form -->
+                                                <div th:if="${bet.acceptor != null and bet.acceptor.username == user.username and bet.acceptorResult == null}" class="mb-2">
+                                                    <form th:action="@{/bets/{id}/submit-result(id=${bet.id})}" method="post">
+                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                                        <input type="hidden" name="isCreator" value="false" />
+                                                        <div class="input-group input-group-sm">
+                                                            <select class="form-select" name="result" required>
+                                                                <option value="">Select Result</option>
+                                                                <option value="WIN">Win</option>
+                                                                <option value="LOSS">Loss</option>
+                                                                <option value="DRAW">Draw</option>
+                                                            </select>
+                                                            <button type="submit" class="btn btn-warning">
+                                                                <i class="fas fa-flag me-1"></i>Submit Result
+                                                            </button>
+                                                        </div>
+                                                        <div class="form-text small">Submit your game result</div>
+                                                    </form>
+                                                </div>
+                                                
+                                                <!-- Show submitted results -->
+                                                <div th:if="${bet.creatorResult != null or bet.acceptorResult != null}" class="mb-2">
+                                                    <div class="small text-muted">
+                                                        <strong>Results Submitted:</strong>
+                                                        <div th:if="${bet.creatorResult != null}">
+                                                            Creator: <span th:text="${bet.creatorResult}"></span>
+                                                        </div>
+                                                        <div th:if="${bet.acceptorResult != null}">
+                                                            Acceptor: <span th:text="${bet.acceptorResult}"></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <!-- Cancel Button (for both users when accepted/code shared) -->
-                                            <div th:if="${(bet.status == 'ACCEPTED' or bet.status == 'CODE_SHARED') and 
-                                                         (bet.creator.username == user.username or (bet.acceptor != null and bet.acceptor.username == user.username))}">
+                                            <div th:if="${(bet.status.name() == 'ACCEPTED' or bet.status.name() == 'CODE_SHARED') and 
+                                                         ((bet.creator != null and bet.creator.username == user.username) or 
+                                                          (bet.acceptor != null and bet.acceptor.username == user.username))}">
                                                 <form th:action="@{/bets/{id}/cancel(id=${bet.id})}" method="post" 
                                                       onsubmit="return confirmCancel('active')">
                                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -196,7 +254,7 @@
                                             </div>
 
                                             <!-- My Bet Indicator -->
-                                            <div th:if="${bet.creator.username == user.username}" class="text-center mt-2">
+                                            <div th:if="${bet.creator != null and bet.creator.username == user.username}" class="text-center mt-2">
                                                 <small class="text-primary">
                                                     <i class="fas fa-star me-1"></i>Your Bet
                                                 </small>
@@ -218,6 +276,13 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div th:if="${allBets == null or allBets.empty}" class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No bets available</h5>
+                            <p class="text-muted">Create your first bet challenge to get started!</p>
                         </div>
 
                         <!-- Pagination -->
@@ -296,11 +361,8 @@
                     }
                 }
                 
-                console.log('User points detected:', userPoints);
-                
                 function validatePoints() {
                     const enteredPoints = parseInt(pointsInput.value) || 0;
-                    console.log('Entered points:', enteredPoints, 'User points:', userPoints);
                     
                     if (enteredPoints > userPoints) {
                         pointsInput.setCustomValidity('You only have ' + userPoints + ' points available');
@@ -398,21 +460,51 @@
                     return confirm('Are you sure you want to cancel this active bet? Both players will get their points back.');
                 }
             }
-            // Debug script - remove this after fixing
-            console.log('Play page loaded');
-            console.log('Points input:', document.getElementById('points'));
-            console.log('Create bet button:', document.getElementById('createBetBtn'));
-            console.log('User points badge:', document.querySelector('.badge.bg-light.text-dark'));
-
-            // Test: Simulate input to see if validation works
-            setTimeout(() => {
-                const testInput = document.getElementById('points');
-                if (testInput) {
-                    console.log('Testing validation...');
-                    testInput.value = '50';
-                    testInput.dispatchEvent(new Event('input'));
-                }
-            }, 1000);
+        });
+    </script>
+    <script>
+        // Simple polling for updates
+        function startPolling() {
+            setInterval(() => {
+                fetch(window.location.href)
+                    .then(response => response.text())
+                    .then(html => {
+                        // Check if any bet status has changed
+                        const currentBets = document.querySelectorAll('.card');
+                        const parser = new DOMParser();
+                        const newDoc = parser.parseFromString(html, 'text/html');
+                        const newBets = newDoc.querySelectorAll('.card');
+                        
+                        let shouldRefresh = false;
+                        
+                        // Simple check: if number of bets changed, refresh
+                        if (currentBets.length !== newBets.length) {
+                            shouldRefresh = true;
+                        }
+                        
+                        // Check status changes
+                        currentBets.forEach((currentBet, index) => {
+                            if (newBets[index]) {
+                                const currentStatus = currentBet.querySelector('.badge').textContent;
+                                const newStatus = newBets[index].querySelector('.badge').textContent;
+                                
+                                if (currentStatus !== newStatus) {
+                                    shouldRefresh = true;
+                                }
+                            }
+                        });
+                        
+                        if (shouldRefresh) {
+                            console.log('Changes detected, refreshing page...');
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => console.error('Polling error:', error));
+            }, 5000); // Check every 5 seconds
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            startPolling();
         });
     </script>
 </div>

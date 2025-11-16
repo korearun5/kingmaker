@@ -17,10 +17,7 @@ import com.kore.king.entity.BetStatus;
 @Repository
 public interface BetRepository extends JpaRepository<Bet, Long> {
     
-    @Query("SELECT b FROM Bet b WHERE b.status = :status AND b.creator.id != :userId ORDER BY b.createdAt DESC")
-    Page<Bet> findAvailableBets(@Param("status") BetStatus status, 
-                               @Param("userId") Long userId, 
-                               Pageable pageable);
+
 
     @Query("SELECT b FROM Bet b WHERE b.status = :status AND (b.creator.id = :userId OR b.acceptor.id = :userId)")
     List<Bet> findByStatusAndUserId(@Param("status") BetStatus status, 
@@ -32,15 +29,7 @@ public interface BetRepository extends JpaRepository<Bet, Long> {
     @Query("SELECT b FROM Bet b WHERE b.creator.id = :userId OR b.acceptor.id = :userId ORDER BY b.createdAt DESC")
     Page<Bet> findUserBets(@Param("userId") Long userId, Pageable pageable);
     
-    @Query("SELECT b FROM Bet b WHERE (b.creator.id = :userId OR b.acceptor.id = :userId) " +
-           "AND b.status IN (com.kore.king.entity.BetStatus.PENDING, " +
-           "com.kore.king.entity.BetStatus.ACCEPTED, " +
-           "com.kore.king.entity.BetStatus.CODE_SHARED) " +
-           "ORDER BY b.createdAt DESC")
-    List<Bet> findUserActiveBets(@Param("userId") Long userId);
-    
-    @Query("SELECT b FROM Bet b LEFT JOIN FETCH b.acceptor WHERE b.id = :betId")
-    Optional<Bet> findByIdWithAcceptor(@Param("betId") Long betId);
+
     
     // REMOVE THE DUPLICATE: Only keep one findByStatus method
     List<Bet> findByStatus(BetStatus status); // KEEP THIS ONE
@@ -69,10 +58,27 @@ public interface BetRepository extends JpaRepository<Bet, Long> {
     @Query("SELECT SUM(b.points) FROM Bet b WHERE b.status = 'COMPLETED'")
     Optional<Integer> sumCompletedBetPoints();
     
-// In BetRepository
-@Query("SELECT b FROM Bet b WHERE b.creator.id = :userId OR b.acceptor.id = :userId OR b.status = 'PENDING' ORDER BY b.createdAt DESC")
-Page<Bet> findAllBetsForUserWithAvailable(@Param("userId") Long userId, Pageable pageable);
-    
+
     @Query("SELECT b FROM Bet b WHERE b.creator.id = :userId OR b.acceptor.id = :userId ORDER BY b.createdAt DESC")
     Page<Bet> findAllBetsForUser(@Param("userId") Long userId, Pageable pageable);
+
+@Query("SELECT b FROM Bet b " +
+       "LEFT JOIN FETCH b.creator " +
+       "LEFT JOIN FETCH b.acceptor " +
+       "WHERE b.creator.id = :userId OR b.acceptor.id = :userId OR b.status = 'PENDING' " +
+       "ORDER BY b.createdAt DESC")
+Page<Bet> findAllBetsForUserWithAvailable(@Param("userId") Long userId, Pageable pageable);
+    
+    // Also update other methods that need these relationships
+    @Query("SELECT b FROM Bet b LEFT JOIN FETCH b.creator LEFT JOIN FETCH b.acceptor WHERE b.id = :betId")
+    Optional<Bet> findByIdWithAcceptor(@Param("betId") Long betId);
+    
+    @Query("SELECT b FROM Bet b LEFT JOIN FETCH b.creator LEFT JOIN FETCH b.acceptor WHERE b.status = :status AND b.creator.id != :userId ORDER BY b.createdAt DESC")
+    Page<Bet> findAvailableBets(@Param("status") BetStatus status, 
+                               @Param("userId") Long userId, 
+                               Pageable pageable);
+    
+    // Add this method for better performance
+    @Query("SELECT b FROM Bet b LEFT JOIN FETCH b.creator LEFT JOIN FETCH b.acceptor WHERE (b.creator.id = :userId OR b.acceptor.id = :userId) AND b.status IN ('PENDING', 'ACCEPTED', 'CODE_SHARED') ORDER BY b.createdAt DESC")
+    List<Bet> findUserActiveBets(@Param("userId") Long userId);
 }

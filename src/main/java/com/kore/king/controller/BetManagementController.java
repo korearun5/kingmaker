@@ -84,7 +84,23 @@ public class BetManagementController {
         
         return "redirect:/user/play";
     }
-
+    @PostMapping("/{id}/submit-result")
+    public String submitResult(@PathVariable Long id, 
+                            @RequestParam String result,
+                            @RequestParam boolean isCreator,
+                            Authentication authentication, 
+                            RedirectAttributes redirectAttributes) {
+        try {
+            String username = authentication.getName();
+            betService.submitResult(id, username, result, null, isCreator);
+            redirectAttributes.addFlashAttribute("success", "Result submitted successfully!");
+            
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        
+        return "redirect:/user/play";
+    }
     @PostMapping("/{id}/cancel")
     public String cancelBet(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
         try {

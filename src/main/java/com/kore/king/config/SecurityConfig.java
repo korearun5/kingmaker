@@ -61,7 +61,7 @@ public class SecurityConfig {
             // CSRF Configuration
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers("/ws/**", "/api/**", "/bets/**") // Only exclude necessary endpoints
+                .ignoringRequestMatchers("/ws/**", "/api/**", "/bets/**", "/app/**") // Only exclude necessary endpoints
             )
             
             // Session Management
@@ -75,7 +75,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // Public endpoints
                 .requestMatchers("/", "/register", "/login", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                .requestMatchers("/ws/**").permitAll()
+                //.requestMatchers("/ws/**").permitAll()
                 
                 // User endpoints
                 .requestMatchers("/dashboard", "/user/**", "/buy-points/**", "/withdraw/**").hasAnyRole("USER", "EMPLOYEE_ADMIN", "MAIN_ADMIN")
@@ -84,7 +84,9 @@ public class SecurityConfig {
                 .requestMatchers("/admin/payments/**", "/admin/settings/**", "/admin/create-admin").hasRole("MAIN_ADMIN")
                 .requestMatchers("/admin/users/**", "/admin/transactions/**", "/admin/support/**", "/admin/game-ids/**").hasAnyRole("MAIN_ADMIN", "EMPLOYEE_ADMIN")
                 .requestMatchers("/admin/**").hasAnyRole("MAIN_ADMIN", "EMPLOYEE_ADMIN")
-                
+                // In your SecurityConfig
+                .requestMatchers("/ws/**", "/api/**", "/app/**", "/topic/**", "/queue/**", "/user/**").permitAll()
+
                 // Secure all other endpoints
                 .anyRequest().authenticated()
             )

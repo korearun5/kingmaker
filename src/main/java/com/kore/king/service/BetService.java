@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -379,59 +381,108 @@ public class BetService {
         return bet.getStatus() == BetStatus.PENDING || bet.getStatus() == BetStatus.ACCEPTED;
     }
 
-    // Broadcasting methods - ONLY ONE COPY OF EACH
-    private void broadcastNewBet(Bet bet) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "NEW_BET");
-        message.put("bet", createBetDTO(bet));
-        messagingTemplate.convertAndSend("/topic/bet-updates", message);
+    // Add these methods to BetService.java
+
+private static final Logger logger = LoggerFactory.getLogger(BetService.class);
+
+private void broadcastNewBet(Bet bet) {
+    logger.info("📢 Broadcasting NEW_BET to all users. Bet: {}, Creator: {}", 
+        bet.getId(), bet.getCreator().getUsername());
+    
+    Map<String, Object> message = new HashMap<>();
+    message.put("type", "NEW_BET");
+    message.put("bet", createBetDTO(bet));
+    message.put("timestamp", System.currentTimeMillis());
+    
+    messagingTemplate.convertAndSend("/topic/bets/all", message);
+    logger.info("✅ NEW_BET broadcast complete");
+}
+
+private void broadcastBetAccepted(Bet bet) {
+    logger.info("📢 Broadcasting BET_ACCEPTED. Bet: {}, Acceptor: {}, Creator: {}", 
+        bet.getId(), bet.getAcceptor().getUsername(), bet.getCreator().getUsername());
+    
+    Map<String, Object> message = new HashMap<>();
+    message.put("type", "BET_ACCEPTED");
+    message.put("bet", createBetDTO(bet));
+    message.put("timestamp", System.currentTimeMillis());
+    
+    // Notify both users specifically
+    if (bet.getCreator() != null) {
+        messagingTemplate.convertAndSendToUser(
+            bet.getCreator().getUsername(),
+            "/queue/notifications",
+            message
+        );
+        logger.info("✅ Notified creator: {}", bet.getCreator().getUsername());
     }
     
-    private void broadcastBetAccepted(Bet bet) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "BET_ACCEPTED");
-        message.put("bet", createBetDTO(bet));
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
-        if (bet.getAcceptor() != null) {
-            messagingTemplate.convertAndSend("/topic/user/" + bet.getAcceptor().getUsername(), message);
-        }
+    if (bet.getAcceptor() != null) {
+        messagingTemplate.convertAndSendToUser(
+            bet.getAcceptor().getUsername(), 
+            "/queue/notifications",
+            message
+        );
+        logger.info("✅ Notified acceptor: {}", bet.getAcceptor().getUsername());
     }
+    
+    // Also broadcast to the bet room
+    messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+}
     
     private void broadcastCodeShared(Bet bet) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "CODE_SHARED");
-        message.put("bet", createBetDTO(bet));
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+        Map<String, Object> betDTO = createBetDTO(bet);
+        
+        // Specifically notify the acceptor
+        if (bet.getAcceptor() != null) {
+            broadcastToUser(bet.getAcceptor().getUsername(), "CODE_SHARED", betDTO);
+        }
+        
+        broadcastToBetParticipants(bet, "CODE_SHARED", betDTO);
     }
     
     private void broadcastResultUpdate(Bet bet, String username, String result) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "RESULT_SUBMITTED");
-        message.put("betId", bet.getId());
-        message.put("username", username);
-        message.put("result", result);
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+        Map<String, Object> update = new HashMap<>();
+        update.put("betId", bet.getId());
+        update.put("username", username);
+        update.put("result", result);
+        update.put("bothSubmitted", bet.bothResultsSubmitted());
+        
+        // Notify the other participant
+        String otherUser = bet.getCreator().getUsername().equals(username) ? 
+            (bet.getAcceptor() != null ? bet.getAcceptor().getUsername() : null) : 
+            bet.getCreator().getUsername();
+        
+        if (otherUser != null) {
+            broadcastToUser(otherUser, "RESULT_SUBMITTED", update);
+        }
+        
+        broadcastToBetParticipants(bet, "RESULT_SUBMITTED", update);
     }
-    
     private void broadcastBetCancelled(Bet bet, String cancelledBy) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "BET_CANCELLED");
-        message.put("bet", createBetDTO(bet));
-        message.put("cancelledBy", cancelledBy);
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+        Map<String, Object> betDTO = createBetDTO(bet);
+        betDTO.put("cancelledBy", cancelledBy);
+        
+        broadcastToBetParticipants(bet, "BET_CANCELLED", betDTO);
     }
     
     private void broadcastBetCompleted(Bet bet) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", "BET_COMPLETED");
-        message.put("bet", createBetDTO(bet));
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+        Map<String, Object> betDTO = createBetDTO(bet);
         
+        broadcastToBetParticipants(bet, "BET_COMPLETED", betDTO);
+        
+        // Also update points for both users
         if (bet.getCreator() != null) {
-            messagingTemplate.convertAndSend("/topic/user/" + bet.getCreator().getUsername(), message);
+            Map<String, Object> pointsUpdate = new HashMap<>();
+            pointsUpdate.put("availablePoints", bet.getCreator().getAvailablePoints());
+            pointsUpdate.put("heldPoints", bet.getCreator().getHeldPoints());
+            broadcastToUser(bet.getCreator().getUsername(), "POINTS_UPDATED", pointsUpdate);
         }
         if (bet.getAcceptor() != null) {
-            messagingTemplate.convertAndSend("/topic/user/" + bet.getAcceptor().getUsername(), message);
+            Map<String, Object> pointsUpdate = new HashMap<>();
+            pointsUpdate.put("availablePoints", bet.getAcceptor().getAvailablePoints());
+            pointsUpdate.put("heldPoints", bet.getAcceptor().getHeldPoints());
+            broadcastToUser(bet.getAcceptor().getUsername(), "POINTS_UPDATED", pointsUpdate);
         }
     }
 
@@ -556,5 +607,42 @@ public class BetService {
     
     public List<Bet> findByStatusInAndUserId(List<BetStatus> statuses, Long userId) {
         return betRepository.findByStatusInAndUserId(statuses, userId);
+    }
+    // Add these methods to your existing BetService.java
+
+    private void broadcastToUser(String username, String type, Object payload) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", type);
+        message.put("payload", payload);
+        message.put("timestamp", System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", message);
+    }
+
+    private void broadcastToBetParticipants(Bet bet, String type, Object payload) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", type);
+        message.put("payload", payload);
+        message.put("betId", bet.getId());
+        message.put("timestamp", System.currentTimeMillis());
+        
+        // Send to bet-specific topic
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+        
+        // Send to individual users
+        if (bet.getCreator() != null) {
+            messagingTemplate.convertAndSendToUser(
+                bet.getCreator().getUsername(), 
+                "/queue/bet-updates", 
+                message
+            );
+        }
+        if (bet.getAcceptor() != null) {
+            messagingTemplate.convertAndSendToUser(
+                bet.getAcceptor().getUsername(), 
+                "/queue/bet-updates", 
+                message
+            );
+        }
     }
 }

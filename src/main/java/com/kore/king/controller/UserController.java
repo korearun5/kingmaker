@@ -9,6 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -122,5 +123,25 @@ public String playPage(Authentication authentication, Model model,
         return String.format("User: %s, Available: %d, Held: %d, Total: %d", 
             username, user.getAvailablePoints(), user.getHeldPoints(), 
             user.getAvailablePoints() + user.getHeldPoints());
+    }
+    @GetMapping("/bets/{id}/card")
+    public String getBetCard(@PathVariable Long id, Authentication authentication, Model model) {
+        try {
+            Bet bet = betService.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Bet not found"));
+            
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            model.addAttribute("bet", bet);
+            model.addAttribute("user", user);
+            model.addAttribute("userPoints", user.getAvailablePoints());
+            
+            return "user/bet-card :: bet-card"; // You'll need to create this fragment
+            
+        } catch (Exception e) {
+            return "<div class='alert alert-danger'>Error loading bet</div>";
+        }
     }
 }

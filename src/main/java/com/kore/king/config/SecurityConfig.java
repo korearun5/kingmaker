@@ -56,39 +56,37 @@ public class SecurityConfig {
             // CSRF Configuration
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers("/ws/**", "/api/**", "/bets/**", "/app/**")
+                .ignoringRequestMatchers("/ws/**", "/api/**")
             )
             
             // Session Management
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 .maximumSessions(1)
-                .maxSessionsPreventsLogin(true)
+                .maxSessionsPreventsLogin(false)
             )
             
-            // Authorization
+            // Authorization - FIXED: Remove static dashboard expectation
             .authorizeHttpRequests(authz -> authz
                 // Public endpoints
                 .requestMatchers("/", "/register", "/login", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                .requestMatchers("/ws/**", "/api/**", "/app/**", "/topic/**", "/queue/**", "/user/**").permitAll()
+                .requestMatchers("/ws/**").permitAll()
                 
-                // User endpoints
-                .requestMatchers("/dashboard", "/user/**", "/buy-points/**", "/withdraw/**").hasAnyRole("USER", "EMPLOYEE_ADMIN", "MAIN_ADMIN")
+                // User endpoints - REQUIRE AUTHENTICATION
+                .requestMatchers("/user/**", "/bets/**").authenticated()
                 
                 // Admin endpoints
-                .requestMatchers("/admin/payments/**", "/admin/settings/**", "/admin/create-admin").hasRole("MAIN_ADMIN")
-                .requestMatchers("/admin/users/**", "/admin/transactions/**", "/admin/support/**", "/admin/game-ids/**").hasAnyRole("MAIN_ADMIN", "EMPLOYEE_ADMIN")
                 .requestMatchers("/admin/**").hasAnyRole("MAIN_ADMIN", "EMPLOYEE_ADMIN")
                 
                 // Secure all other endpoints
                 .anyRequest().authenticated()
             )
             
-            // Form Login
+            // Form Login - FIXED: Use /user/play as default success
             .formLogin(form -> form
                 .loginPage("/login")
                 .loginProcessingUrl("/login")
-                .defaultSuccessUrl("/dashboard", true)
+                .defaultSuccessUrl("/user/play", true) // Changed from /dashboard to /user/play
                 .failureUrl("/login?error=true")
                 .usernameParameter("username")
                 .passwordParameter("password")
@@ -104,21 +102,8 @@ public class SecurityConfig {
                 .permitAll()
             )
             
-            // Headers Security
-            .headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp
-                    .policyDirectives("default-src 'self'; " +
-                        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-                        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
-                        "img-src 'self' data: https:; " +
-                        "connect-src 'self' ws: wss:;")
-                )
-                .frameOptions().deny()
-            )
-            
             // Exception Handling
             .exceptionHandling(exceptions -> exceptions
-                .accessDeniedPage("/error/403")
                 .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"))
             );
 

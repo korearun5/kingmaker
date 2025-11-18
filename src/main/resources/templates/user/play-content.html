@@ -38,10 +38,8 @@
                                 <div class="col-md-6 mb-3">
                                     <label for="gameType" class="form-label">Game Type</label>
                                     <select class="form-select" id="gameType" name="gameType" required>
-                                        <option value="FIFA">FIFA</option>
-                                        <option value="NBA2K">NBA 2K</option>
-                                        <option value="COD">Call of Duty</option>
-                                        <option value="Other">Other</option>
+                                        <option value="Classic">Classic</option>
+                                        <option value="Popular">Popular</option>
                                     </select>
                                 </div>
                             </div>
@@ -49,7 +47,7 @@
                             <div class="mb-3">
                                 <label for="title" class="form-label">Bet Title (Optional)</label>
                                 <input type="text" class="form-control" id="title" name="title"
-                                       placeholder="e.g., FIFA 24 Match, NBA 2K Showdown, etc.">
+                                       placeholder="e.g., no theme, no auto etc">
                             </div>
 
                             <div class="d-grid">
@@ -102,7 +100,7 @@
                                             </div>
                                             <div class="small text-muted mb-1">
                                                 <i class="fas fa-gamepad me-1"></i>
-                                                <strong>Game:</strong> <span th:text="${bet.gameType}">FIFA</span>
+                                                <strong>Game:</strong> <span th:text="${bet.gameType}">Classic</span>
                                             </div>
                                             <div class="small text-muted mb-1">
                                                 <i class="fas fa-user me-1"></i>
@@ -157,11 +155,15 @@
                                             </div>
 
                                             <!-- Cancel Button (for creator when pending) -->
-                                            <div th:if="${bet.status.name() == 'PENDING' and bet.creator != null and bet.creator.username == user.username}">
+                                            <!-- Cancel Button (for both users when accepted - but NOT when code shared) -->
+                                            <div th:if="${(bet.status.name() == 'PENDING') and 
+                                                        ((bet.creator != null and bet.creator.username == user.username) or 
+                                                        (bet.acceptor != null and bet.acceptor.username == user.username))
+                                                        and bet.gameCode == null}">
                                                 <form th:action="@{/bets/{id}/cancel(id=${bet.id})}" method="post" 
-                                                      onsubmit="return confirmCancel('pending')" class="mb-2">
+                                                    onsubmit="return confirmCancel('active')">
                                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                                                    <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">
                                                         <i class="fas fa-times me-1"></i>Cancel Bet
                                                     </button>
                                                 </form>
@@ -195,8 +197,8 @@
                                                             <select class="form-select" name="result" required>
                                                                 <option value="">Select Result</option>
                                                                 <option value="WIN">Win</option>
-                                                                <option value="LOSS">Loss</option>
-                                                                <option value="DRAW">Draw</option>
+                                                                <option value="LOSE">Lose</option>
+                                                                <option value="CANCEL">Cancel</option>
                                                             </select>
                                                             <button type="submit" class="btn btn-warning">
                                                                 <i class="fas fa-flag me-1"></i>Submit Result
@@ -215,8 +217,8 @@
                                                             <select class="form-select" name="result" required>
                                                                 <option value="">Select Result</option>
                                                                 <option value="WIN">Win</option>
-                                                                <option value="LOSS">Loss</option>
-                                                                <option value="DRAW">Draw</option>
+                                                                <option value="LOSE">Lose</option>
+                                                                <option value="CANCEL">Cancel</option>
                                                             </select>
                                                             <button type="submit" class="btn btn-warning">
                                                                 <i class="fas fa-flag me-1"></i>Submit Result
@@ -241,7 +243,7 @@
                                             </div>
 
                                             <!-- Cancel Button (for both users when accepted/code shared) -->
-                                            <div th:if="${(bet.status.name() == 'ACCEPTED' or bet.status.name() == 'CODE_SHARED') and 
+                                            <div th:if="${(bet.status.name() == 'ACCEPTED' ) and 
                                                          ((bet.creator != null and bet.creator.username == user.username) or 
                                                           (bet.acceptor != null and bet.acceptor.username == user.username))}">
                                                 <form th:action="@{/bets/{id}/cancel(id=${bet.id})}" method="post" 

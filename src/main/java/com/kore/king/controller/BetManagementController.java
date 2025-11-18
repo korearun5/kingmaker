@@ -47,7 +47,7 @@ public class BetManagementController {
             
             Bet createdBet = betService.createBet(creator.getId(), points, gameType, betTitle, conditions);
             
-            redirectAttributes.addFlashAttribute("success", "Bet created successfully!");
+            //redirectAttributes.addFlashAttribute("success", "Bet created successfully!");
             
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
@@ -64,7 +64,7 @@ public class BetManagementController {
                     .orElseThrow(() -> new RuntimeException("User not found"));
             
             betService.acceptBet(id, acceptor.getId());
-            redirectAttributes.addFlashAttribute("success", "Bet accepted successfully!");
+            //redirectAttributes.addFlashAttribute("success", "Bet accepted successfully!");
             
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
@@ -79,7 +79,7 @@ public class BetManagementController {
         try {
             String username = authentication.getName();
             betService.setGameCode(id, gameCode, username);
-            redirectAttributes.addFlashAttribute("success", "Game code shared successfully!");
+            //redirectAttributes.addFlashAttribute("success", "Game code shared successfully!");
             
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
@@ -96,7 +96,7 @@ public class BetManagementController {
         try {
             String username = authentication.getName();
             betService.submitResult(id, username, result, null, isCreator);
-            redirectAttributes.addFlashAttribute("success", "Result submitted successfully!");
+            //redirectAttributes.addFlashAttribute("success", "Result submitted successfully!");
             
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
@@ -109,7 +109,7 @@ public class BetManagementController {
         try {
             String username = authentication.getName();
             betService.cancelBet(id, username);
-            redirectAttributes.addFlashAttribute("success", "Bet cancelled successfully.");
+            //redirectAttributes.addFlashAttribute("success", "Bet cancelled successfully.");
             
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());

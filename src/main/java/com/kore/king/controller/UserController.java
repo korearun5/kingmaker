@@ -31,69 +31,89 @@ public class UserController {
         this.betService = betService;
     }
 
-@GetMapping("/play")
-public String playPage(Authentication authentication, Model model,
+    @GetMapping("/play")
+    public String playPage(Authentication authentication, Model model,
                     @RequestParam(defaultValue = "0") int page,
                     @RequestParam(defaultValue = "10") int size) {
-    try {
-        String username = authentication.getName();
-        User user = userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        try {
+            // Safe authentication handling
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return "redirect:/login";
+            }
 
-        model.addAttribute("userPoints", user.getAvailablePoints());
-        model.addAttribute("user", user);
-        
-        Pageable pageable = PageRequest.of(page, size);
-        
-        // Get all bets for display
-        Page<Bet> allBets = betService.findAllBetsForUserWithAvailable(user.getId(), pageable);
-        
-        // Debug logging
-        System.out.println("Total bets found: " + allBets.getTotalElements());
-        System.out.println("Bets content: " + allBets.getContent());
-        
-        model.addAttribute("allBets", allBets);
-        
-        // Get user's active bets for quick access
-        List<Bet> userActiveBets = betService.getUserActiveBets(user.getId());
-        model.addAttribute("userActiveBets", userActiveBets);
-        
-        model.addAttribute("pageTitle", "Play Game");
-        model.addAttribute("content", "user/play-content");
-        return "layouts/user-layout";
-        
-    } catch (Exception e) {
-        System.out.println("Error in playPage: " + e.getMessage());
-        e.printStackTrace();
-        model.addAttribute("error", "Error loading play game page: " + e.getMessage());
-        model.addAttribute("content", "user/play-content");
-        return "layouts/user-layout";
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            model.addAttribute("userPoints", user.getAvailablePoints());
+            model.addAttribute("user", user);
+            
+            Pageable pageable = PageRequest.of(page, size);
+            
+            // Get all bets for display
+            Page<Bet> allBets = betService.findAllBetsForUserWithAvailable(user.getId(), pageable);
+            
+            // Debug logging
+            System.out.println("Total bets found: " + allBets.getTotalElements());
+            System.out.println("Bets content: " + allBets.getContent());
+            
+            model.addAttribute("allBets", allBets);
+            
+            // Get user's active bets for quick access
+            List<Bet> userActiveBets = betService.getUserActiveBets(user.getId());
+            model.addAttribute("userActiveBets", userActiveBets);
+            
+            model.addAttribute("pageTitle", "Play Game");
+            model.addAttribute("content", "user/play-content");
+            return "layouts/user-layout";
+            
+        } catch (Exception e) {
+            System.out.println("Error in playPage: " + e.getMessage());
+            e.printStackTrace();
+            model.addAttribute("error", "Error loading play game page: " + e.getMessage());
+            model.addAttribute("content", "user/play-content");
+            return "layouts/user-layout";
+        }
     }
-}
     
     // Keep other simple pages as they are
     @GetMapping("/history")
     public String historyPage(Authentication authentication, Model model) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
         return getUserPage(authentication, model, "Bet History", "user/history-content");
     }
 
     @GetMapping("/players")
     public String playersPage(Authentication authentication, Model model) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
         return getUserPage(authentication, model, "Players", "user/players-content");
     }
 
     @GetMapping("/refer")
     public String referPage(Authentication authentication, Model model) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
         return getUserPage(authentication, model, "Refer & Earn", "user/refer-content");
     }
 
     @GetMapping("/game-ids")
     public String gameIdsPage(Authentication authentication, Model model) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
         return getUserPage(authentication, model, "Game IDs", "user/game-ids-content");
     }
 
     @GetMapping("/support")
     public String supportPage(Authentication authentication, Model model) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
         return getUserPage(authentication, model, "Support", "user/support-content");
     }
     
@@ -113,9 +133,31 @@ public String playPage(Authentication authentication, Model model,
             return "layouts/user-layout";
         }
     }
+    @GetMapping("/dashboard")
+    public String dashboard(Authentication authentication, Model model) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
+        try {
+            String username = authentication.getName();
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            model.addAttribute("user", user);
+            model.addAttribute("pageTitle", "Dashboard");
+            model.addAttribute("content", "user/dashboard-content");
+            return "layouts/user-layout"; 
+        } catch (Exception e) {
+            model.addAttribute("error", "Error loading dashboard: " + e.getMessage());
+            return "redirect:/login";
+        }
+    }
     @GetMapping("/debug/points")
     @ResponseBody
     public String debugPoints(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "Not authenticated";
+        }
         String username = authentication.getName();
         User user = userService.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -127,6 +169,9 @@ public String playPage(Authentication authentication, Model model,
     @GetMapping("/bets/{id}/card")
     public String getBetCard(@PathVariable Long id, Authentication authentication, Model model) {
         try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return "<div class='alert alert-danger'>Not authenticated</div>";
+            }
             Bet bet = betService.findById(id)
                     .orElseThrow(() -> new RuntimeException("Bet not found"));
             

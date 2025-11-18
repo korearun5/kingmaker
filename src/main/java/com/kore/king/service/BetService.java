@@ -188,9 +188,9 @@ public class BetService {
         Bet bet = betRepository.findById(betId)
             .orElseThrow(() -> new RuntimeException("Bet not found"));
         
-        if (bet.getStatus() != BetStatus.CODE_SHARED) {
-            throw new RuntimeException("Game code must be shared before submitting results");
-        }
+        //if (bet.getStatus() == BetStatus.CODE_SHARED) {
+        //    throw new RuntimeException("Game code must be shared before submitting results");
+        //}
         
         if ((isCreator && bet.getCreatorResult() != null) || 
             (!isCreator && bet.getAcceptorResult() != null)) {

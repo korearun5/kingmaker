@@ -78,8 +78,8 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div th:if="${allBets != null and !allBets.empty}" class="row">
-                            <div th:each="bet : ${allBets.content}" class="col-md-6 col-lg-4 mb-3">
+                        <div id="betList" th:if="${allBets != null and !allBets.empty}" class="row">
+                            <div th:each="bet : ${allBets.content}" class="col-md-6 col-lg-4 mb-3" th:attr="data-bet-id=${bet.id}">
                                 <div th:class="'card h-100 shadow-sm ' + 
                                     (${bet.creator != null and bet.creator.username == user.username} ? 'border-primary' : 
                                     (${bet.status.name() == 'PENDING'} ? 'border-warning' : 'border-secondary'))">
@@ -128,7 +128,7 @@
                                                     <code class="ms-1" th:text="${bet.gameCode}"></code>
                                                 </div>
                                                 <button type="button" class="btn btn-sm btn-outline-success" 
-                                                        onclick="copyToClipboard(this)" data-code="${bet.gameCode}">
+                                                        onclick="copyToClipboard(this)" th:attr="data-code=${bet.gameCode}">
                                                     <i class="fas fa-copy"></i>
                                                 </button>
                                             </div>
@@ -325,406 +325,252 @@
         </div>
     </div>
 
-    <!-- Replace the entire polling script in play-content.html with this: -->
+    <!-- Simplified WebSocket Real-time Updates -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.0/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.0/dist/sockjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
-
-<script>
-    class DebugWebSocketManager {
-        constructor() {
-            this.stompClient = null;
-            this.connected = false;
-            this.username = '[[${user?.username}]]';
-            this.debugEnabled = true;
-            this.reconnectAttempts = 0;
-            this.maxReconnectAttempts = 5;
-        }
-
-        log(message, data = null) {
-            if (this.debugEnabled) {
-                const timestamp = new Date().toISOString();
-                console.log(`[WebSocket ${timestamp}] ${message}`, data || '');
-                
-                // Also show in UI for debugging
-                this.showDebugMessage(`[${timestamp}] ${message}`);
+    <script>
+        class BetWebSocketManager {
+            constructor() {
+                this.stompClient = null;
+                this.connected = false;
+                this.username = '[[${user?.username}]]';
             }
-        }
 
-        showDebugMessage(message) {
-            // Create debug panel if it doesn't exist
-            let debugPanel = document.getElementById('websocket-debug-panel');
-            if (!debugPanel) {
-                debugPanel = document.createElement('div');
-                debugPanel.id = 'websocket-debug-panel';
-                debugPanel.style.cssText = `
-                    position: fixed;
-                    bottom: 10px;
-                    right: 10px;
-                    width: 400px;
-                    height: 300px;
-                    background: #f8f9fa;
-                    border: 1px solid #ccc;
-                    padding: 10px;
-                    overflow-y: auto;
-                    font-size: 12px;
-                    z-index: 10000;
-                    display: none;
-                `;
-                document.body.appendChild(debugPanel);
-            }
-            
-            const messageElement = document.createElement('div');
-            messageElement.style.cssText = 'margin-bottom: 5px; padding: 2px; border-bottom: 1px solid #eee;';
-            messageElement.textContent = message;
-            debugPanel.appendChild(messageElement);
-            debugPanel.scrollTop = debugPanel.scrollHeight;
-        }
-
-        connect() {
-            this.log('Attempting WebSocket connection...');
-            
-            try {
+            connect() {
                 const socket = new SockJS('/ws');
                 this.stompClient = Stomp.over(socket);
                 
-                // Enable STOMP debugging
-                this.stompClient.debug = (str) => {
-                    this.log('STOMP Debug:', str);
-                };
+                // Disable verbose debugging
+                this.stompClient.debug = null;
                 
-                this.log('SockJS created, attempting STOMP connection...');
-                
-                const headers = {};
-                
-                this.stompClient.connect(headers, 
+                this.stompClient.connect({}, 
                     // Success callback
                     (frame) => {
-                        this.log('WebSocket connected successfully!', frame);
+                        console.log('WebSocket connected successfully');
                         this.connected = true;
-                        this.reconnectAttempts = 0;
-                        
                         this.subscribeToChannels();
-                        this.notifyServer();
-                        
-                        this.showNotification('WebSocket connected!', 'success');
                     }, 
                     // Error callback
                     (error) => {
-                        this.log('WebSocket connection failed:', error);
+                        console.error('WebSocket connection failed:', error);
                         this.connected = false;
-                        this.handleReconnection();
                     }
                 );
-                
-            } catch (error) {
-                this.log('Error creating WebSocket connection:', error);
-                this.handleReconnection();
             }
-        }
 
-        subscribeToChannels() {
-            this.log('Subscribing to WebSocket channels...');
-            
-            try {
+            subscribeToChannels() {
                 // Global bet updates
-                const betsSubscription = this.stompClient.subscribe('/topic/bets/all', (message) => {
-                    this.log('Received message on /topic/bets/all:', message.body);
+                this.stompClient.subscribe('/topic/bets/all', (message) => {
                     this.handleBetMessage(JSON.parse(message.body));
                 });
-                this.log('Subscribed to /topic/bets/all');
 
                 // User-specific updates
-                const userSubscription = this.stompClient.subscribe('/user/queue/bet-updates', (message) => {
-                    this.log('Received message on /user/queue/bet-updates:', message.body);
+                this.stompClient.subscribe('/user/queue/bet-updates', (message) => {
                     this.handleBetMessage(JSON.parse(message.body));
                 });
-                this.log('Subscribed to /user/queue/bet-updates');
 
                 // Notifications
-                const notificationsSubscription = this.stompClient.subscribe('/user/queue/notifications', (message) => {
-                    this.log('Received message on /user/queue/notifications:', message.body);
+                this.stompClient.subscribe('/user/queue/notifications', (message) => {
                     this.handleNotification(JSON.parse(message.body));
                 });
-                this.log('Subscribed to /user/queue/notifications');
-
-                // Test subscription
-                const testSubscription = this.stompClient.subscribe('/topic/test', (message) => {
-                    this.log('Test message received:', message.body);
-                });
-                this.log('Subscribed to /topic/test');
-
-            } catch (error) {
-                this.log('Error subscribing to channels:', error);
             }
-        }
 
-        handleBetMessage(message) {
-            this.log('Processing bet message:', message);
-            
-            switch (message.type) {
-                case 'NEW_BET':
-                    this.log('NEW_BET received', message.bet);
-                    this.addNewBet(message.bet);
-                    break;
-                case 'BET_ACCEPTED':
-                    this.log('BET_ACCEPTED received', message.payload);
-                    this.updateBet(message.payload);
+            handleBetMessage(message) {
+                console.log('Received bet update:', message.type, message.bet?.id);
+                
+                switch (message.type) {
+                    case 'NEW_BET':
+                        this.showNotification('New bet created: ' + message.bet.title, 'info');
+                        // Refresh the page to show new bet
+                        setTimeout(() => window.location.reload(), 1000);
+                        break;
+                    case 'BET_ACCEPTED':
+                        this.showNotification('Your bet has been accepted!', 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                        break;
+                    case 'CODE_SHARED':
+                        this.showNotification('Game code has been shared!', 'info');
+                        setTimeout(() => window.location.reload(), 1000);
+                        break;
+                    case 'BET_CANCELLED':
+                        this.removeBet(message.bet);
+                        if (message.bet.creator.username === this.username) {
+                            this.showNotification('Your bet has been cancelled', 'warning');
+                        } else {
+                            this.showNotification('A bet you were viewing has been cancelled', 'warning');
+                        }
+                        break;
+                    case 'BET_COMPLETED':
+                        this.showNotification('Bet completed!', 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                        break;
+                    case 'POINTS_UPDATED':
+                        this.updateUserPoints(message.payload);
+                        break;
+                    case 'RESULT_SUBMITTED':
+                        this.showNotification('Result submitted by other player', 'info');
+                        setTimeout(() => window.location.reload(), 1000);
+                        break;
+                }
+            }
+
+            handleNotification(message) {
+                if (message.type === 'BET_ACCEPTED') {
                     this.showNotification('Your bet has been accepted!', 'success');
-                    break;
-                case 'CODE_SHARED':
-                    this.log('CODE_SHARED received', message.payload);
-                    this.updateBet(message.payload);
-                    this.showNotification('Game code has been shared!', 'info');
-                    break;
-                case 'RESULT_SUBMITTED':
-                    this.log('RESULT_SUBMITTED received', message.payload);
-                    this.handleResultSubmitted(message.payload);
-                    break;
-                case 'BET_CANCELLED':
-                    this.log('BET_CANCELLED received', message.payload);
-                    this.removeBet(message.payload);
-                    this.showNotification('Bet has been cancelled', 'warning');
-                    break;
-                case 'BET_COMPLETED':
-                    this.log('BET_COMPLETED received', message.payload);
-                    this.updateBet(message.payload);
-                    this.showNotification('Bet completed!', 'success');
-                    break;
-                case 'POINTS_UPDATED':
-                    this.log('POINTS_UPDATED received', message.payload);
-                    this.updateUserPoints(message.payload);
-                    break;
-                default:
-                    this.log('Unknown message type:', message.type);
+                } else if (message.type === 'CODE_SHARED') {
+                    this.showNotification('Game code has been shared for your bet!', 'info');
+                }
             }
-        }
 
-        handleNotification(message) {
-            this.log('Processing notification:', message);
-            if (message.type === 'BET_ACCEPTED') {
-                this.showNotification('Your bet has been accepted!', 'success');
-            } else if (message.type === 'CODE_SHARED') {
-                this.showNotification('Game code has been shared for your bet!', 'info');
+            removeBet(betData) {
+                console.log('Removing bet from UI:', betData.id);
+                const betElement = document.querySelector(`[data-bet-id="${betData.id}"]`);
+                if (betElement) {
+                    betElement.remove();
+                    
+                    // Update the total bets counter
+                    this.updateBetsCounter();
+                    
+                    // Show empty state if no bets left
+                    this.checkEmptyState();
+                }
             }
-        }
 
-        notifyServer() {
-            if (this.stompClient && this.connected) {
-                this.log('Notifying server of connection...');
-                this.stompClient.send("/app/bets/subscribe", {}, JSON.stringify({
-                    username: this.username,
-                    timestamp: new Date().toISOString()
-                }));
+            updateBetsCounter() {
+                const totalBadge = document.querySelector('.badge.bg-light.text-dark');
+                if (totalBadge) {
+                    const currentBets = document.querySelectorAll('#betList .col-md-6').length;
+                    totalBadge.textContent = 'Total: ' + currentBets;
+                }
             }
-        }
 
-        sendTestMessage() {
-            if (this.stompClient && this.connected) {
-                this.log('Sending test message...');
-                this.stompClient.send("/app/test", {}, JSON.stringify({
-                    message: 'Test from client',
-                    username: this.username,
-                    timestamp: new Date().toISOString()
-                }));
-            } else {
-                this.log('Cannot send test message - not connected');
+            checkEmptyState() {
+                const betList = document.getElementById('betList');
+                const emptyState = document.querySelector('.text-center.py-5');
+                
+                if (betList && betList.children.length === 0 && emptyState) {
+                    emptyState.style.display = 'block';
+                }
             }
-        }
 
-        handleReconnection() {
-            if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                this.reconnectAttempts++;
-                const delay = 3000 * this.reconnectAttempts;
-                this.log(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+            updateUserPoints(pointsData) {
+                // Update points display in header
+                const pointsElement = document.querySelector('.user-points span:last-child');
+                if (pointsElement) {
+                    pointsElement.textContent = pointsData.availablePoints + ' Points';
+                }
+
+                // Update points in create bet form
+                const pointsBadge = document.querySelector('.badge.bg-light.text-dark');
+                if (pointsBadge) {
+                    pointsBadge.textContent = 'Balance: ' + pointsData.availablePoints + ' points';
+                }
+
+                // Update form validation
+                this.updatePointsValidation(pointsData.availablePoints);
+            }
+
+            updatePointsValidation(availablePoints) {
+                const pointsInput = document.getElementById('points');
+                const createBetBtn = document.getElementById('createBetBtn');
+                
+                if (pointsInput && createBetBtn) {
+                    const currentPoints = parseInt(pointsInput.value) || 0;
+                    
+                    if (currentPoints > availablePoints) {
+                        pointsInput.setCustomValidity('You only have ' + availablePoints + ' points available');
+                        createBetBtn.disabled = true;
+                    } else {
+                        pointsInput.setCustomValidity('');
+                        createBetBtn.disabled = availablePoints < 10;
+                    }
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+                toast.style.cssText = 'top: 20px; right: 20px; z-index: 1060; min-width: 300px;';
+                toast.innerHTML = `
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                document.body.appendChild(toast);
                 
                 setTimeout(() => {
-                    this.log('Attempting reconnection...');
-                    this.connect();
-                }, delay);
-            } else {
-                this.log('Max reconnection attempts reached');
-                this.showNotification('Real-time updates unavailable. Please refresh page.', 'error');
+                    if (toast.parentNode) {
+                        toast.remove();
+                    }
+                }, 5000);
             }
         }
 
-        disconnect() {
-            this.log('Disconnecting WebSocket...');
-            if (this.stompClient) {
-                this.stompClient.disconnect();
-            }
-            this.connected = false;
-        }
+        // Initialize WebSocket when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            window.betWebSocketManager = new BetWebSocketManager();
+            window.betWebSocketManager.connect();
 
-        getStatus() {
-            return {
-                connected: this.connected,
-                reconnectAttempts: this.reconnectAttempts,
-                username: this.username
-            };
-        }
-
-        // UI update methods (simplified versions)
-        addNewBet(betData) {
-            this.log('Adding new bet:', betData);
-            // Force page refresh for now until we implement dynamic updates
-            window.location.reload();
-        }
-
-        updateBet(betData) {
-            this.log('Updating bet:', betData);
-            window.location.reload();
-        }
-
-        removeBet(betData) {
-            this.log('Removing bet:', betData);
-            window.location.reload();
-        }
-
-        updateUserPoints(pointsData) {
-            this.log('Updating points:', pointsData);
-            // Update points display
-            const pointsElement = document.querySelector('.user-points span:last-child');
-            if (pointsElement) {
-                pointsElement.textContent = pointsData.availablePoints + ' Points';
-            }
-        }
-
-        showNotification(message, type = 'info') {
-            this.log('Showing notification:', { message, type });
-            
-            const toast = document.createElement('div');
-            toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-            toast.style.cssText = 'top: 20px; right: 20px; z-index: 1060; min-width: 300px;';
-            toast.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
+            // Handle page unload
+            window.addEventListener('beforeunload', function() {
+                if (window.betWebSocketManager && window.betWebSocketManager.stompClient) {
+                    window.betWebSocketManager.stompClient.disconnect();
                 }
-            }, 5000);
-        }
-    }
-
-    // Initialize and expose for debugging
-    document.addEventListener('DOMContentLoaded', function() {
-        window.wsManager = new DebugWebSocketManager();
-        window.wsManager.connect();
-
-        // Add debug controls to page
-        addDebugControls();
-        
-        // Handle page unload
-        window.addEventListener('beforeunload', function() {
-            if (window.wsManager) {
-                window.wsManager.disconnect();
-            }
+            });
         });
 
-        // Test WebSocket every 10 seconds
-        setInterval(() => {
-            if (window.wsManager && window.wsManager.connected) {
-                window.wsManager.sendTestMessage();
+        // Copy game code to clipboard
+        function copyToClipboard(button) {
+            const gameCode = button.getAttribute('data-code');
+            navigator.clipboard.writeText(gameCode).then(function() {
+                const originalHtml = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                button.classList.remove('btn-outline-success');
+                button.classList.add('btn-success');
+                
+                setTimeout(function() {
+                    button.innerHTML = originalHtml;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-outline-success');
+                }, 2000);
+            });
+        }
+
+        // Enhanced confirmation messages
+        function confirmCancel(betType) {
+            if (betType === 'pending') {
+                return confirm('Are you sure you want to cancel this pending bet? You will get your points back.');
+            } else {
+                return confirm('Are you sure you want to cancel this active bet? Both players will get their points back.');
             }
-        }, 10000);
-    });
-
-    function addDebugControls() {
-        const debugControls = document.createElement('div');
-        debugControls.style.cssText = 'position: fixed; bottom: 10px; left: 10px; z-index: 10000;';
-        debugControls.innerHTML = `
-            <div class="btn-group-vertical">
-                <button class="btn btn-sm btn-info" onclick="window.wsManager.connect()">Connect WS</button>
-                <button class="btn btn-sm btn-warning" onclick="window.wsManager.disconnect()">Disconnect WS</button>
-                <button class="btn btn-sm btn-success" onclick="window.wsManager.sendTestMessage()">Test WS</button>
-                <button class="btn btn-sm btn-secondary" onclick="toggleDebugPanel()">Toggle Debug</button>
-                <button class="btn btn-sm btn-primary" onclick="checkWSStatus()">Status</button>
-            </div>
-        `;
-        document.body.appendChild(debugControls);
-    }
-
-    function toggleDebugPanel() {
-        const panel = document.getElementById('websocket-debug-panel');
-        if (panel) {
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
         }
-    }
 
-    function checkWSStatus() {
-        if (window.wsManager) {
-            const status = window.wsManager.getStatus();
-            alert(`WebSocket Status:\nConnected: ${status.connected}\nUsername: ${status.username}\nReconnect Attempts: ${status.reconnectAttempts}`);
-        } else {
-            alert('WebSocket manager not initialized');
-        }
-    }
-</script>
-<!-- Add this to your play-content.html -->
-<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.0/dist/sockjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+        // Points validation
+        document.addEventListener('DOMContentLoaded', function() {
+            const pointsInput = document.getElementById('points');
+            const createBetBtn = document.getElementById('createBetBtn');
 
-<script>
-// Simple WebSocket connection test
-console.log('🧪 Starting WebSocket connection test...');
-
-const socket = new SockJS('/ws');
-const stompClient = Stomp.over(socket);
-
-// Disable STOMP debugging (it's too verbose)
-stompClient.debug = null;
-
-stompClient.connect({}, function(frame) {
-    console.log('✅ WebSocket Connected! User: [[${user?.username}]]');
-    
-    // Subscribe to test channel
-    stompClient.subscribe('/topic/test', function(message) {
-        const data = JSON.parse(message.body);
-        console.log('📨 Received test message:', data);
-        showNotification('WebSocket: ' + data.message, 'success');
-    });
-    
-    // Subscribe to bet updates
-    stompClient.subscribe('/topic/bets/all', function(message) {
-        const data = JSON.parse(message.body);
-        console.log('🎲 New bet update:', data);
-        if (data.type === 'NEW_BET') {
-            showNotification('New bet created: ' + data.bet.title, 'info');
-            // Force refresh for now
-            setTimeout(() => window.location.reload(), 1000);
-        }
-    });
-    
-    // Notify server we're connected
-    stompClient.send("/app/bets/subscribe", {}, JSON.stringify({
-        username: '[[${user?.username}]]',
-        action: 'connected'
-    }));
-    
-}, function(error) {
-    console.error('❌ WebSocket connection failed:', error);
-});
-
-function showNotification(message, type) {
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type} alert-dismissible fade show`;
-    alert.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    document.querySelector('.main-content').prepend(alert);
-    
-    setTimeout(() => {
-        if (alert.parentNode) alert.remove();
-    }, 5000);
-}
-
-// Make it globally available for testing
-window.wsClient = stompClient;
-</script>
+            if (pointsInput && createBetBtn) {
+                function validatePoints() {
+                    const userPoints = parseInt('[[${userPoints}]]') || 0;
+                    const enteredPoints = parseInt(pointsInput.value) || 0;
+                    
+                    if (enteredPoints > userPoints) {
+                        pointsInput.setCustomValidity('You only have ' + userPoints + ' points available');
+                        createBetBtn.disabled = true;
+                    } else if (enteredPoints < 10) {
+                        pointsInput.setCustomValidity('Minimum bet is 10 points');
+                        createBetBtn.disabled = true;
+                    } else {
+                        pointsInput.setCustomValidity('');
+                        createBetBtn.disabled = false;
+                    }
+                }
+                
+                pointsInput.addEventListener('input', validatePoints);
+                pointsInput.addEventListener('change', validatePoints);
+            }
+        });
+    </script>
 </div>

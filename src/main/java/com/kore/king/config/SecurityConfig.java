@@ -20,25 +20,20 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
-import com.kore.king.config.JwtAuthenticationFilter;
-
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
 public class SecurityConfig {
 
     private final UserDetailsService userDetailsService;
-    //private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(UserDetailsService userDetailsService
-                         ) {
+    public SecurityConfig(UserDetailsService userDetailsService) {
         this.userDetailsService = userDetailsService;
-        //this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12); // Increased strength
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean
@@ -61,7 +56,7 @@ public class SecurityConfig {
             // CSRF Configuration
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers("/ws/**", "/api/**", "/bets/**", "/app/**") // Only exclude necessary endpoints
+                .ignoringRequestMatchers("/ws/**", "/api/**", "/bets/**", "/app/**")
             )
             
             // Session Management
@@ -75,18 +70,16 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // Public endpoints
                 .requestMatchers("/", "/register", "/login", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                //.requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/ws/**", "/api/**", "/app/**", "/topic/**", "/queue/**", "/user/**").permitAll()
                 
                 // User endpoints
                 .requestMatchers("/dashboard", "/user/**", "/buy-points/**", "/withdraw/**").hasAnyRole("USER", "EMPLOYEE_ADMIN", "MAIN_ADMIN")
                 
-                // Admin endpoints with role hierarchy
+                // Admin endpoints
                 .requestMatchers("/admin/payments/**", "/admin/settings/**", "/admin/create-admin").hasRole("MAIN_ADMIN")
                 .requestMatchers("/admin/users/**", "/admin/transactions/**", "/admin/support/**", "/admin/game-ids/**").hasAnyRole("MAIN_ADMIN", "EMPLOYEE_ADMIN")
                 .requestMatchers("/admin/**").hasAnyRole("MAIN_ADMIN", "EMPLOYEE_ADMIN")
-                // In your SecurityConfig
-                .requestMatchers("/ws/**", "/api/**", "/app/**", "/topic/**", "/queue/**", "/user/**").permitAll()
-
+                
                 // Secure all other endpoints
                 .anyRequest().authenticated()
             )
@@ -121,7 +114,6 @@ public class SecurityConfig {
                         "connect-src 'self' ws: wss:;")
                 )
                 .frameOptions().deny()
-                .xssProtection().disable() // Let CSP handle XSS
             )
             
             // Exception Handling
@@ -133,15 +125,12 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // Add security event publisher for auditing
     @Bean
     public ApplicationListener<AbstractAuthenticationEvent> authenticationEventListener() {
         return event -> {
             if (event instanceof AuthenticationSuccessEvent) {
-                // Log successful authentication
                 System.out.println("User authenticated: " + event.getAuthentication().getName());
             } else if (event instanceof AuthenticationFailureBadCredentialsEvent) {
-                // Log failed authentication attempts
                 System.out.println("Failed authentication attempt: " + event.getAuthentication().getName());
             }
         };

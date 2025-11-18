@@ -1,4 +1,3 @@
-// controller/WebSocketBetController.java
 package com.kore.king.controller;
 
 import java.security.Principal;
@@ -11,22 +10,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
-import com.kore.king.service.BetService;
-import com.kore.king.service.UserService;
-
 @Controller
 public class WebSocketBetController {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final BetService betService;
-    private final UserService userService;
 
-    public WebSocketBetController(SimpMessagingTemplate messagingTemplate, 
-                                BetService betService, 
-                                UserService userService) {
+    public WebSocketBetController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
-        this.betService = betService;
-        this.userService = userService;
     }
 
     @MessageMapping("/bets/subscribe")

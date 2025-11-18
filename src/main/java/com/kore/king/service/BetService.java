@@ -20,8 +20,6 @@ import com.kore.king.config.AppConfig;
 import com.kore.king.entity.Bet;
 import com.kore.king.entity.BetStatus;
 import com.kore.king.entity.Result;
-import com.kore.king.entity.Transaction;
-import com.kore.king.entity.TransactionType;
 import com.kore.king.entity.User;
 import com.kore.king.repository.BetRepository;
 import com.kore.king.repository.TransactionRepository;
@@ -31,6 +29,8 @@ import jakarta.persistence.EntityManager;
 @Service
 @Transactional
 public class BetService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(BetService.class);
     
     private final BetRepository betRepository;
     private final UserService userService;
@@ -87,8 +87,6 @@ public class BetService {
             throw new RuntimeException("User not found");
         }
 
-        System.out.println("Creating bet for user: " + creator.getUsername() + " with " + points + " points");
-        
         if (!creator.canAffordBet(points)) {
             throw new RuntimeException("Insufficient points. Available: " + creator.getAvailablePoints());
         }
@@ -99,12 +97,7 @@ public class BetService {
         bet.setDescription(description);
         Bet savedBet = betRepository.save(bet);
         
-        System.out.println("Bet created successfully - ID: " + savedBet.getId() + 
-                        ", Status: " + savedBet.getStatus() + 
-                        ", Creator: " + savedBet.getCreator().getUsername());
-        
         transactionService.recordBetCreation(savedBet);
-        
         broadcastNewBet(savedBet);
         
         return savedBet;
@@ -119,10 +112,6 @@ public class BetService {
         if (acceptor == null) {
             throw new RuntimeException("User not found");
         }
-
-        System.out.println("Accepting bet " + betId + " by user " + acceptor.getUsername());
-        System.out.println("Current bet status: " + bet.getStatus());
-        System.out.println("Bet creator: " + bet.getCreator().getUsername());
 
         if (bet.getStatus() != BetStatus.PENDING) {
             throw new RuntimeException("Bet is no longer available. Current status: " + bet.getStatus());
@@ -142,12 +131,7 @@ public class BetService {
         bet.setStatus(BetStatus.ACCEPTED);
         Bet updatedBet = betRepository.save(bet);
         
-        System.out.println("Bet accepted successfully. New status: " + updatedBet.getStatus());
-        System.out.println("Creator: " + updatedBet.getCreator().getUsername());
-        System.out.println("Acceptor: " + updatedBet.getAcceptor().getUsername());
-        
         transactionService.recordBetAcceptance(updatedBet);
-        
         broadcastBetAccepted(updatedBet);
         
         return updatedBet;
@@ -194,7 +178,6 @@ public class BetService {
         bet.setCodeSharedAt(LocalDateTime.now());
         
         Bet updatedBet = betRepository.save(bet);
-        
         broadcastCodeShared(updatedBet);
         
         return updatedBet;
@@ -232,7 +215,6 @@ public class BetService {
         }
         
         betRepository.save(bet);
-        
         broadcastResultUpdate(bet, username, result);
     }
 
@@ -381,54 +363,42 @@ public class BetService {
         return bet.getStatus() == BetStatus.PENDING || bet.getStatus() == BetStatus.ACCEPTED;
     }
 
-    // Add these methods to BetService.java
-
-private static final Logger logger = LoggerFactory.getLogger(BetService.class);
-
-private void broadcastNewBet(Bet bet) {
-    logger.info("📢 Broadcasting NEW_BET to all users. Bet: {}, Creator: {}", 
-        bet.getId(), bet.getCreator().getUsername());
-    
-    Map<String, Object> message = new HashMap<>();
-    message.put("type", "NEW_BET");
-    message.put("bet", createBetDTO(bet));
-    message.put("timestamp", System.currentTimeMillis());
-    
-    messagingTemplate.convertAndSend("/topic/bets/all", message);
-    logger.info("✅ NEW_BET broadcast complete");
-}
-
-private void broadcastBetAccepted(Bet bet) {
-    logger.info("📢 Broadcasting BET_ACCEPTED. Bet: {}, Acceptor: {}, Creator: {}", 
-        bet.getId(), bet.getAcceptor().getUsername(), bet.getCreator().getUsername());
-    
-    Map<String, Object> message = new HashMap<>();
-    message.put("type", "BET_ACCEPTED");
-    message.put("bet", createBetDTO(bet));
-    message.put("timestamp", System.currentTimeMillis());
-    
-    // Notify both users specifically
-    if (bet.getCreator() != null) {
-        messagingTemplate.convertAndSendToUser(
-            bet.getCreator().getUsername(),
-            "/queue/notifications",
-            message
-        );
-        logger.info("✅ Notified creator: {}", bet.getCreator().getUsername());
+    // WebSocket Broadcasting Methods
+    private void broadcastNewBet(Bet bet) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "NEW_BET");
+        message.put("bet", createBetDTO(bet));
+        message.put("timestamp", System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSend("/topic/bets/all", message);
     }
-    
-    if (bet.getAcceptor() != null) {
-        messagingTemplate.convertAndSendToUser(
-            bet.getAcceptor().getUsername(), 
-            "/queue/notifications",
-            message
-        );
-        logger.info("✅ Notified acceptor: {}", bet.getAcceptor().getUsername());
+
+    private void broadcastBetAccepted(Bet bet) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "BET_ACCEPTED");
+        message.put("bet", createBetDTO(bet));
+        message.put("timestamp", System.currentTimeMillis());
+        
+        // Notify both users specifically
+        if (bet.getCreator() != null) {
+            messagingTemplate.convertAndSendToUser(
+                bet.getCreator().getUsername(),
+                "/queue/notifications",
+                message
+            );
+        }
+        
+        if (bet.getAcceptor() != null) {
+            messagingTemplate.convertAndSendToUser(
+                bet.getAcceptor().getUsername(), 
+                "/queue/notifications",
+                message
+            );
+        }
+        
+        // Also broadcast to the bet room
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
     }
-    
-    // Also broadcast to the bet room
-    messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
-}
     
     private void broadcastCodeShared(Bet bet) {
         Map<String, Object> betDTO = createBetDTO(bet);
@@ -459,10 +429,23 @@ private void broadcastBetAccepted(Bet bet) {
         
         broadcastToBetParticipants(bet, "RESULT_SUBMITTED", update);
     }
+
+    // In BetService.java - Update the broadcastBetCancelled method
+
     private void broadcastBetCancelled(Bet bet, String cancelledBy) {
         Map<String, Object> betDTO = createBetDTO(bet);
         betDTO.put("cancelledBy", cancelledBy);
         
+        // Broadcast to ALL users since cancelled bets should disappear from everyone's view
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "BET_CANCELLED");
+        message.put("bet", betDTO);
+        message.put("timestamp", System.currentTimeMillis());
+        
+        // Broadcast to all users, not just participants
+        messagingTemplate.convertAndSend("/topic/bets/all", message);
+        
+        // Also notify the participants specifically
         broadcastToBetParticipants(bet, "BET_CANCELLED", betDTO);
     }
     
@@ -486,7 +469,43 @@ private void broadcastBetAccepted(Bet bet) {
         }
     }
 
-    // Helper method to create Bet DTO - ADD THIS METHOD
+    private void broadcastToUser(String username, String type, Object payload) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", type);
+        message.put("payload", payload);
+        message.put("timestamp", System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", message);
+    }
+
+    private void broadcastToBetParticipants(Bet bet, String type, Object payload) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", type);
+        message.put("payload", payload);
+        message.put("betId", bet.getId());
+        message.put("timestamp", System.currentTimeMillis());
+        
+        // Send to bet-specific topic
+        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
+        
+        // Send to individual users
+        if (bet.getCreator() != null) {
+            messagingTemplate.convertAndSendToUser(
+                bet.getCreator().getUsername(), 
+                "/queue/bet-updates", 
+                message
+            );
+        }
+        if (bet.getAcceptor() != null) {
+            messagingTemplate.convertAndSendToUser(
+                bet.getAcceptor().getUsername(), 
+                "/queue/bet-updates", 
+                message
+            );
+        }
+    }
+
+    // Helper method to create Bet DTO
     private Map<String, Object> createBetDTO(Bet bet) {
         Map<String, Object> dto = new HashMap<>();
         dto.put("id", bet.getId());
@@ -525,78 +544,6 @@ private void broadcastBetAccepted(Bet bet) {
         return betRepository.findByStatus(status);
     }
 
-    @Transactional
-    public void resolveBetWithCommission(Bet bet) {
-        User winner = bet.determineWinner();
-        int totalPot = bet.getPoints() * 2;
-        
-        if (winner != null) {
-            double platformFeeRate = hasReferrer(winner) ? 0.03 : 0.04;
-            int platformFee = (int) (totalPot * platformFeeRate);
-            int winnerAmount = totalPot - platformFee;
-            
-            winner.awardPoints(winnerAmount);
-            
-            if (hasReferrer(winner)) {
-                int referralBonus = (int) (totalPot * 0.01);
-                awardReferralBonus(winner, referralBonus);
-            }
-            
-            recordPlatformFee(platformFee);
-            
-            updateUserStats(bet, winner);
-        } else {
-            handleDispute(bet);
-        }
-    }
-    
-    private boolean hasReferrer(User winner) {
-        return referralService.hasActiveReferrer(winner);
-    }
-
-    private void awardReferralBonus(User winner, int referralBonus) {
-        referralService.awardReferralCommission(winner, referralBonus);
-    }
-    
-    private void recordPlatformFee(int platformFee) {
-        Transaction platformTransaction = new Transaction();
-        platformTransaction.setPoints(platformFee);
-        platformTransaction.setType(TransactionType.PLATFORM_FEE);
-        platformTransaction.setDescription("Platform fee collected");
-        platformTransaction.setCreatedAt(LocalDateTime.now());
-        transactionRepository.save(platformTransaction);
-    }
-    
-    private void updateUserStats(Bet bet, User winner) {
-        if (winner.getId().equals(bet.getCreator().getId())) {
-            bet.getCreator().setWins(bet.getCreator().getWins() + 1);
-            bet.getAcceptor().setLosses(bet.getAcceptor().getLosses() + 1);
-        } else {
-            bet.getAcceptor().setWins(bet.getAcceptor().getWins() + 1);
-            bet.getCreator().setLosses(bet.getCreator().getLosses() + 1);
-        }
-        
-        userService.saveUser(bet.getCreator());
-        userService.saveUser(bet.getAcceptor());
-    }
-    
-    private void handleDispute(Bet bet) {
-        bet.getCreator().releasePoints(bet.getPoints());
-        if (bet.getAcceptor() != null) {
-            bet.getAcceptor().releasePoints(bet.getPoints());
-        }
-        
-        bet.setStatus(BetStatus.DISPUTED);
-        bet.setDisputeReason("Results conflict - requires admin review");
-        
-        userService.saveUser(bet.getCreator());
-        if (bet.getAcceptor() != null) {
-            userService.saveUser(bet.getAcceptor());
-        }
-        
-        transactionService.recordBetRefund(bet);
-    }
-
     public Page<Bet> findAllBetsForUser(Long userId, Pageable pageable) {
         return betRepository.findAllBetsForUser(userId, pageable);
     }
@@ -607,42 +554,5 @@ private void broadcastBetAccepted(Bet bet) {
     
     public List<Bet> findByStatusInAndUserId(List<BetStatus> statuses, Long userId) {
         return betRepository.findByStatusInAndUserId(statuses, userId);
-    }
-    // Add these methods to your existing BetService.java
-
-    private void broadcastToUser(String username, String type, Object payload) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", type);
-        message.put("payload", payload);
-        message.put("timestamp", System.currentTimeMillis());
-        
-        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", message);
-    }
-
-    private void broadcastToBetParticipants(Bet bet, String type, Object payload) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", type);
-        message.put("payload", payload);
-        message.put("betId", bet.getId());
-        message.put("timestamp", System.currentTimeMillis());
-        
-        // Send to bet-specific topic
-        messagingTemplate.convertAndSend("/topic/bet/" + bet.getId(), message);
-        
-        // Send to individual users
-        if (bet.getCreator() != null) {
-            messagingTemplate.convertAndSendToUser(
-                bet.getCreator().getUsername(), 
-                "/queue/bet-updates", 
-                message
-            );
-        }
-        if (bet.getAcceptor() != null) {
-            messagingTemplate.convertAndSendToUser(
-                bet.getAcceptor().getUsername(), 
-                "/queue/bet-updates", 
-                message
-            );
-        }
     }
 }
